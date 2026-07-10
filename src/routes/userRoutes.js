@@ -8,7 +8,9 @@ const {
   getUserProfile,
   getOwnProfile,
   updateUserProfile,
-  deleteUser
+  deleteUser,
+  changePassword,
+  deleteOwnAccount,
 } = require('../controllers/userController');
 const { protect, protectUser } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
@@ -17,12 +19,13 @@ router.post('/register', registerUser);
 router.post('/send-otp', sendOtp);
 router.post('/login', loginUser);
 
-// User protected route for fetching and editing own profile
 router.route('/profile')
   .get(protectUser, getOwnProfile)
   .put(protectUser, upload.single('profileImage'), updateUserProfile);
 
-// Admin protected routes
+router.put('/change-password', protectUser, changePassword);
+router.delete('/account', protectUser, deleteOwnAccount);
+
 router.route('/')
   .get(protect, getAllUsers);
 

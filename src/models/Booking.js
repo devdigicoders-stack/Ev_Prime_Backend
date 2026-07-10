@@ -51,6 +51,9 @@ const bookingSchema = new mongoose.Schema({
   },
   qrCode: { type: String },
   pin: { type: String },
+  carbonSavedKg: { type: Number, default: 0 },
+  fuelSavedLiters: { type: Number, default: 0 },
+  treesEquivalent: { type: Number, default: 0 },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Booking', bookingSchema);

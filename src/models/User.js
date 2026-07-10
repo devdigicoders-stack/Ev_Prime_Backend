@@ -39,7 +39,15 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['active', 'inactive'],
     default: 'active'
-  }
+  },
+  password: {
+    type: String,
+    default: ''
+  },
+  totalCarbonSavedKg: { type: Number, default: 0 },
+  totalFuelSavedLiters: { type: Number, default: 0 },
+  totalEnergyConsumedKwh: { type: Number, default: 0 },
+  totalTreesEquivalent: { type: Number, default: 0 },
 }, {
   timestamps: true
 });

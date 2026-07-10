@@ -58,6 +58,10 @@ const referralRoutes = require('./routes/referralRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const newsRoutes = require('./routes/newsRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
+const invoiceRoutes = require('./routes/invoiceRoutes');
+const marketRoutes = require('./routes/marketRoutes');
+const feedbackRoutes = require('./routes/feedbackRoutes');
+const pricingRoutes = require('./routes/pricingRoutes');
 app.use('/api/admin', adminRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/vehicle', vehicleRoutes);
@@ -87,6 +91,10 @@ app.use('/api/offers', offerRoutes);
 app.use('/api/emergency', emergencyRoutes);
 app.use('/api/referral', referralRoutes);
 app.use('/api/booking', bookingRoutes);
+app.use('/api/invoice', invoiceRoutes);
+app.use('/api/market', marketRoutes);
+app.use('/api/feedback', feedbackRoutes);
+app.use('/api/pricing', pricingRoutes);
 // Basic Route
 app.get('/', (req, res) => {
   res.send('API is running...');

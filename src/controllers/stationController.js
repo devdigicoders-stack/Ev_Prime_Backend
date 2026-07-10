@@ -5,31 +5,32 @@ const Station = require('../models/Station');
 // @access  Private (Admin)
 const createStation = async (req, res) => {
   try {
-    const { name, location, city, address, latitude, longitude, powerCapacity, connectors, partner, status } = req.body;
+    const { name, location, city, address, latitude, longitude, powerCapacity, connectors, partner, status, connectorTypes, amenities, openHours } = req.body;
 
     if (!name || !location || !city || !connectors || !partner) {
       return res.status(400).json({ message: 'Please provide all required fields (name, location, city, connectors, partner)' });
     }
 
-    const stationData = {
-      name,
-      location,
-      city,
-      address,
-      latitude,
-      longitude,
-      powerCapacity,
-      connectors,
-      partner,
-      status: status || 'Active'
-    };
-
-    if (req.file) {
-      stationData.image = `/uploads/${req.file.filename}`;
+    // Parse connectorTypes if sent as string (FormData)
+    let parsedConnectorTypes = [];
+    if (connectorTypes) {
+      try {
+        parsedConnectorTypes = typeof connectorTypes === 'string' ? JSON.parse(connectorTypes) : connectorTypes;
+      } catch (e) { parsedConnectorTypes = []; }
     }
 
-    const station = await Station.create(stationData);
+    const stationData = {
+      name, location, city, address, latitude, longitude,
+      powerCapacity, connectors, partner,
+      status: status || 'Active',
+      connectorTypes: parsedConnectorTypes,
+      amenities: amenities ? (typeof amenities === 'string' ? JSON.parse(amenities) : amenities) : [],
+      openHours: openHours || '24/7',
+    };
 
+    if (req.file) stationData.image = `/uploads/${req.file.filename}`;
+
+    const station = await Station.create(stationData);
     res.status(201).json(station);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -70,28 +71,29 @@ const getStationById = async (req, res) => {
 const updateStation = async (req, res) => {
   try {
     const station = await Station.findById(req.params.id);
+    if (!station) return res.status(404).json({ message: 'Station not found' });
 
-    if (station) {
-      station.name = req.body.name || station.name;
-      station.location = req.body.location || station.location;
-      station.city = req.body.city || station.city;
-      station.address = req.body.address || station.address;
-      station.latitude = req.body.latitude || station.latitude;
-      station.longitude = req.body.longitude || station.longitude;
-      station.powerCapacity = req.body.powerCapacity || station.powerCapacity;
-      station.connectors = req.body.connectors || station.connectors;
-      station.partner = req.body.partner || station.partner;
-      station.status = req.body.status || station.status;
+    const fields = ['name','location','city','address','latitude','longitude','powerCapacity','connectors','partner','status','openHours'];
+    fields.forEach(f => { if (req.body[f] !== undefined) station[f] = req.body[f]; });
 
-      if (req.file) {
-        station.image = `/uploads/${req.file.filename}`;
-      }
-
-      const updatedStation = await station.save();
-      res.json(updatedStation);
-    } else {
-      res.status(404).json({ message: 'Station not found' });
+    if (req.body.connectorTypes !== undefined) {
+      try {
+        station.connectorTypes = typeof req.body.connectorTypes === 'string'
+          ? JSON.parse(req.body.connectorTypes)
+          : req.body.connectorTypes;
+      } catch (e) {}
     }
+    if (req.body.amenities !== undefined) {
+      try {
+        station.amenities = typeof req.body.amenities === 'string'
+          ? JSON.parse(req.body.amenities)
+          : req.body.amenities;
+      } catch (e) {}
+    }
+    if (req.file) station.image = `/uploads/${req.file.filename}`;
+
+    const updated = await station.save();
+    res.json(updated);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

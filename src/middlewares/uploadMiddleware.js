@@ -10,35 +10,32 @@ if (!fs.existsSync(uploadDir)) {
 
 // Multer storage config
 const storage = multer.diskStorage({
-  destination(req, file, cb) {
-    cb(null, uploadDir); // Save files in backend/uploads
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
   },
-  filename(req, file, cb) {
-    cb(
-      null,
-      `${file.fieldname}-${Date.now()}${path.extname(file.originalname)}`
-    );
-  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
 });
 
-// Check file type
-function checkFileType(file, cb) {
-  const filetypes = /jpg|jpeg|png|gif|svg|webp/;
-  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = filetypes.test(file.mimetype);
-
-  if (extname && mimetype) {
-    return cb(null, true);
+// File filter
+const fileFilter = (req, file, cb) => {
+  const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+  if (allowedMimes.includes(file.mimetype)) {
+    cb(null, true);
   } else {
-    cb(new Error('Images only!'));
+    cb(new Error('Only image files are allowed'), false);
   }
-}
+};
 
+// Create multer instance
 const upload = multer({
-  storage,
-  fileFilter: function (req, file, cb) {
-    checkFileType(file, cb);
-  },
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB
+  }
 });
 
 module.exports = upload;

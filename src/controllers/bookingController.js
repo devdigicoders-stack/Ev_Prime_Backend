@@ -3,6 +3,11 @@ const crypto = require('crypto');
 const Booking = require('../models/Booking');
 const Station = require('../models/Station');
 const Wallet = require('../models/Wallet');
+const User = require('../models/User');
+const Pricing = require('../models/Pricing');
+const { calculateEffectivePrice } = require('./pricingController');
+const { createInvoiceForBooking } = require('./invoiceController');
+const { calculateCarbon } = require('../utils/carbonCalculator');
 
 const getRazorpay = () => new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
@@ -78,6 +83,19 @@ const createBooking = async (req, res) => {
 
     const pin = generatePin();
 
+    // ── Dynamic pricing lookup ──────────────────────────────────
+    let resolvedPricePerUnit = pricePerUnit || 18;
+    try {
+      let pricing = await Pricing.findOne({ scope: 'station', station: stationId, isActive: true });
+      if (!pricing) pricing = await Pricing.findOne({ scope: 'global', isActive: true }).sort({ createdAt: -1 });
+      if (pricing) {
+        const dateTime = scheduledTime ? new Date(`1970-01-01T${scheduledTime}:00`) : new Date();
+        const { effectivePrice } = calculateEffectivePrice(pricing, connectorType, dateTime);
+        resolvedPricePerUnit = effectivePrice;
+      }
+    } catch (e) { console.error('Pricing lookup error:', e.message); }
+    // ────────────────────────────────────────────────────────────
+
     const newBooking = new Booking({
       user: req.user._id,
       station: stationId,
@@ -89,7 +107,7 @@ const createBooking = async (req, res) => {
       estimatedEnergy,
       estimatedTime,
       estimatedCost,
-      pricePerUnit: pricePerUnit || 18,
+      pricePerUnit: resolvedPricePerUnit,
       paymentMethod,
       paymentStatus: 'Paid',
       razorpayOrderId: razorpayOrderId || '',
@@ -273,6 +291,31 @@ const updateBookingStatusAdmin = async (req, res) => {
     ).populate('user', 'name mobile').populate('station', 'name city');
 
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+
+    // Auto-generate invoice when booking is marked Completed
+    if (status === 'Completed') {
+      createInvoiceForBooking(booking).catch(err => console.error('Invoice gen error:', err.message));
+
+      // Calculate and save carbon savings
+      try {
+        const energyKwh = booking.estimatedEnergy || 0;
+        const { carbonSavedKg, treesEquivalent, fuelSavedLiters } = calculateCarbon(energyKwh);
+
+        await Booking.findByIdAndUpdate(booking._id, { carbonSavedKg, treesEquivalent, fuelSavedLiters });
+
+        await User.findByIdAndUpdate(booking.user, {
+          $inc: {
+            totalCarbonSavedKg: carbonSavedKg,
+            totalFuelSavedLiters: fuelSavedLiters,
+            totalEnergyConsumedKwh: energyKwh,
+            totalTreesEquivalent: treesEquivalent,
+          }
+        });
+      } catch (err) {
+        console.error('Carbon calc error:', err.message);
+      }
+    }
+
     res.json({ success: true, data: booking });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

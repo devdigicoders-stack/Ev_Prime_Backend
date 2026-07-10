@@ -10,14 +10,20 @@ const emergencySchema = new mongoose.Schema({
     lat: { type: Number, required: true },
     lng: { type: Number, required: true }
   },
+  issueType: {
+    type: String,
+    enum: ['Battery Dead', 'Tyre Puncture', 'Accident', 'Charging Issue', 'Vehicle Breakdown', 'Other'],
+    default: 'Other'
+  },
+  description: { type: String },
   status: {
     type: String,
-    enum: ['PENDING', 'ASSIGNED', 'RESOLVED'],
-    default: 'PENDING'
+    enum: ['Pending', 'Assigned', 'In Progress', 'Resolved', 'Cancelled'],
+    default: 'Pending'
   },
-  description: {
-    type: String
-  }
+  assignedTo: { type: String, default: '' },
+  adminNote: { type: String, default: '' },
+  resolvedAt: { type: Date },
 }, {
   timestamps: true
 });

@@ -23,6 +23,7 @@
     "morgan": "^1.11.0",
     "multer": "^2.2.0",
     "openai": "^6.45.0",
+    "pdfkit": "^0.19.1",
     "razorpay": "^2.9.6"
   },
   "devDependencies": {
