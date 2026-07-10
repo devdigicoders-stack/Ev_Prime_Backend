@@ -1,0 +1,47 @@
+const mongoose = require('mongoose');
+
+const userSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+  },
+  mobile: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  email: {
+    type: String,
+  },
+  profileImage: {
+    type: String,
+    default: ''
+  },
+  rewardPoints: {
+    type: Number,
+    default: 0
+  },
+  tier: {
+    type: String,
+    enum: ['Bronze', 'Silver', 'Gold', 'Platinum'],
+    default: 'Silver'
+  },
+  referralCode: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+  referredBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  status: {
+    type: String,
+    enum: ['active', 'inactive'],
+    default: 'active'
+  }
+}, {
+  timestamps: true
+});
+
+module.exports = mongoose.model('User', userSchema, 'app_users');
