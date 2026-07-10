@@ -6,7 +6,8 @@ const {
   getStationById,
   updateStation,
   deleteStation,
-  searchStations
+  searchStations,
+  getStationsAlongRoute
 } = require('../controllers/stationController');
 const { protect } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
@@ -15,8 +16,9 @@ router.route('/')
   .post(protect, upload.single('image'), createStation)
   .get(getAllStations);
 
-// Search route must come BEFORE /:id route
+// These routes must come BEFORE /:id route
 router.get('/search', searchStations);
+router.get('/route', getStationsAlongRoute);
 
 router.route('/:id')
   .get(protect, getStationById)

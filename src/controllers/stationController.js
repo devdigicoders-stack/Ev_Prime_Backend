@@ -156,11 +156,68 @@ const deleteStation = async (req, res) => {
   }
 };
 
+// @desc    Get active stations along a route within a radius
+// @route   GET /api/station/route?srcLat=&srcLng=&destLat=&destLng=&radius=
+// @access  Public
+const getStationsAlongRoute = async (req, res) => {
+  try {
+    const { srcLat, srcLng, destLat, destLng, radius = 5 } = req.query;
+    if (!srcLat || !srcLng || !destLat || !destLng) {
+      return res.status(400).json({ success: false, message: 'srcLat, srcLng, destLat, destLng are required' });
+    }
+
+    const aLat = parseFloat(srcLat);
+    const aLng = parseFloat(srcLng);
+    const bLat = parseFloat(destLat);
+    const bLng = parseFloat(destLng);
+    const maxRadius = parseFloat(radius);
+
+    const toRad = (d) => (d * Math.PI) / 180;
+    const haversine = (lat1, lng1, lat2, lng2) => {
+      const R = 6371;
+      const dLat = toRad(lat2 - lat1);
+      const dLng = toRad(lng2 - lng1);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    const pointToSegmentDist = (pLat, pLng) => {
+      const dx = bLat - aLat;
+      const dy = bLng - aLng;
+      if (dx === 0 && dy === 0) return haversine(pLat, pLng, aLat, aLng);
+      const t = Math.max(0, Math.min(1, ((pLat - aLat) * dx + (pLng - aLng) * dy) / (dx * dx + dy * dy)));
+      return haversine(pLat, pLng, aLat + t * dx, aLng + t * dy);
+    };
+
+    const stations = await Station.find({ status: 'Active' });
+    const result = [];
+
+    for (const s of stations) {
+      if (s.latitude == null || s.longitude == null) continue;
+      const distToRoute = pointToSegmentDist(s.latitude, s.longitude);
+      if (distToRoute <= maxRadius) {
+        const distFromSrc = haversine(aLat, aLng, s.latitude, s.longitude);
+        result.push({
+          ...s.toObject(),
+          distFromSrc: parseFloat(distFromSrc.toFixed(2)),
+          distToRoute: parseFloat(distToRoute.toFixed(2))
+        });
+      }
+    }
+
+    result.sort((a, b) => a.distFromSrc - b.distFromSrc);
+    res.json({ success: true, count: result.length, data: result });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   createStation,
   getAllStations,
   getStationById,
   updateStation,
   deleteStation,
-  searchStations
+  searchStations,
+  getStationsAlongRoute
 };
