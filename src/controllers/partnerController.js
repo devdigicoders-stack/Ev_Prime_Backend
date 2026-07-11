@@ -324,6 +324,80 @@ const getMyDashboard = async (req, res) => {
   }
 };
 
+// @desc    Partner: Add a new station
+// @route   POST /api/partner/me/stations
+// @access  Partner
+const addMyStation = async (req, res) => {
+  try {
+    const { name, location, city, address, latitude, longitude, powerCapacity, connectors, status, connectorTypes, amenities, openHours } = req.body;
+    
+    // Inject partner name from auth token
+    const partner = req.partner.name;
+
+    if (!name || !location || !city || !connectors) {
+      return res.status(400).json({ message: 'Please provide all required fields (name, location, city, connectors)' });
+    }
+
+    let parsedConnectorTypes = [];
+    if (connectorTypes) {
+      try {
+        parsedConnectorTypes = typeof connectorTypes === 'string' ? JSON.parse(connectorTypes) : connectorTypes;
+      } catch (e) { parsedConnectorTypes = []; }
+    }
+
+    const stationData = {
+      name, location, city, address, latitude, longitude,
+      powerCapacity, connectors, partner,
+      status: status || 'Active',
+      connectorTypes: parsedConnectorTypes,
+      amenities: amenities ? (typeof amenities === 'string' ? JSON.parse(amenities) : amenities) : [],
+      openHours: openHours || '24/7',
+    };
+
+    if (req.file) stationData.image = `/uploads/${req.file.filename}`;
+
+    const station = await Station.create(stationData);
+    res.status(201).json({ success: true, data: station });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Partner: Update own station
+// @route   PUT /api/partner/me/stations/:id
+// @access  Partner
+const updateMyStation = async (req, res) => {
+  try {
+    // Ensure station belongs to partner
+    const station = await Station.findOne({ _id: req.params.id, partner: req.partner.name });
+    if (!station) return res.status(404).json({ success: false, message: 'Station not found or unauthorized' });
+
+    const fields = ['name','location','city','address','latitude','longitude','powerCapacity','connectors','status','openHours'];
+    fields.forEach(f => { if (req.body[f] !== undefined) station[f] = req.body[f]; });
+
+    if (req.body.connectorTypes !== undefined) {
+      try {
+        station.connectorTypes = typeof req.body.connectorTypes === 'string'
+          ? JSON.parse(req.body.connectorTypes)
+          : req.body.connectorTypes;
+      } catch (e) {}
+    }
+    if (req.body.amenities !== undefined) {
+      try {
+        station.amenities = typeof req.body.amenities === 'string'
+          ? JSON.parse(req.body.amenities)
+          : req.body.amenities;
+      } catch (e) {}
+    }
+    if (req.file) station.image = `/uploads/${req.file.filename}`;
+
+    const updated = await station.save();
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   createPartner,
   getAllPartners,
@@ -338,4 +412,6 @@ module.exports = {
   getMyBookings,
   getMyRevenue,
   getMyDashboard,
+  addMyStation,
+  updateMyStation,
 };

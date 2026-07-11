@@ -14,8 +14,11 @@ const {
   getMyBookings,
   getMyRevenue,
   getMyDashboard,
+  addMyStation,
+  updateMyStation,
 } = require('../controllers/partnerController');
 const { protect, protectPartner } = require('../middlewares/authMiddleware');
+const upload = require('../middlewares/uploadMiddleware');
 
 // Public
 router.post('/login', partnerLogin);
@@ -24,6 +27,8 @@ router.post('/login', partnerLogin);
 router.get('/me', protectPartner, getMyProfile);
 router.get('/me/dashboard', protectPartner, getMyDashboard);
 router.get('/me/stations', protectPartner, getMyStations);
+router.post('/me/stations', protectPartner, upload.single('image'), addMyStation);
+router.put('/me/stations/:id', protectPartner, upload.single('image'), updateMyStation);
 router.get('/me/bookings', protectPartner, getMyBookings);
 router.get('/me/revenue', protectPartner, getMyRevenue);
 
