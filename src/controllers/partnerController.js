@@ -460,12 +460,77 @@ const updateMyProfile = async (req, res) => {
     if (req.body.phone) partner.phone = req.body.phone;
     if (req.body.contactPerson) partner.contactPerson = req.body.contactPerson;
 
+    if (req.body.gstNumber !== undefined) partner.gstNumber = req.body.gstNumber;
+    if (req.body.panNumber !== undefined) partner.panNumber = req.body.panNumber;
+    if (req.body.businessAddress !== undefined) partner.businessAddress = req.body.businessAddress;
+    if (req.body.businessType !== undefined) partner.businessType = req.body.businessType;
+
+    if (req.body.bankDetails) {
+      if (typeof req.body.bankDetails === 'string') {
+        try { partner.bankDetails = JSON.parse(req.body.bankDetails); } catch(e) {}
+      } else {
+        partner.bankDetails = req.body.bankDetails;
+      }
+    }
+
+    if (req.body.taxDetails) {
+      if (typeof req.body.taxDetails === 'string') {
+        try { partner.taxDetails = JSON.parse(req.body.taxDetails); } catch(e) {}
+      } else {
+        partner.taxDetails = req.body.taxDetails;
+      }
+    }
+
+    if (req.body.securitySettings) {
+      if (typeof req.body.securitySettings === 'string') {
+        try { partner.securitySettings = JSON.parse(req.body.securitySettings); } catch(e) {}
+      } else {
+        partner.securitySettings = req.body.securitySettings;
+      }
+    }
+
     if (req.body.password) {
+      if (!req.body.currentPassword) {
+        return res.status(400).json({ success: false, message: 'Current password is required' });
+      }
+      const isMatch = await partner.matchPassword(req.body.currentPassword);
+      if (!isMatch) {
+        return res.status(401).json({ success: false, message: 'Invalid current password' });
+      }
       partner.appPassword = req.body.password;
+    }
+    
+    if (req.file) {
+      partner.logo = `/uploads/${req.file.filename}`;
     }
 
     await partner.save();
     res.json({ success: true, message: 'Profile updated successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Document Upload
+const uploadDocument = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+
+    const partner = await Partner.findById(req.partner.id);
+    if (!partner) return res.status(404).json({ success: false, message: 'Partner not found' });
+
+    if (!partner.documents) partner.documents = [];
+    
+    partner.documents.push({
+      title: req.body.title || 'Untitled Document',
+      category: req.body.category || 'Business',
+      url: `/uploads/${req.file.filename}`
+    });
+
+    await partner.save();
+    res.json({ success: true, message: 'Document uploaded successfully', data: partner.documents });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -599,7 +664,9 @@ module.exports = {
   updateMyStation,
   getStationAnalytics,
   updateMyProfile,
-  getMyStaff, addMyStaff, removeMyStaff,
+  uploadDocument,
+  getMyStaff,
+  addMyStaff, removeMyStaff,
   getMyPayouts, requestPayout,
   getMyPricingTemplates, createPricingTemplate, deletePricingTemplate,
   getMyPromotions, createPromotion,
