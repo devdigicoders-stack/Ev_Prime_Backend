@@ -17,6 +17,11 @@ const {
   addMyStation,
   updateMyStation,
   getStationAnalytics,
+  updateMyProfile,
+  getMyStaff, addMyStaff, removeMyStaff,
+  getMyPayouts, requestPayout,
+  getMyPricingTemplates, createPricingTemplate, deletePricingTemplate,
+  getMyPromotions, createPromotion,
 } = require('../controllers/partnerController');
 const { protect, protectPartner } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
@@ -33,6 +38,27 @@ router.put('/me/stations/:id', protectPartner, upload.single('image'), updateMyS
 router.get('/me/stations/:id/analytics', protectPartner, getStationAnalytics);
 router.get('/me/bookings', protectPartner, getMyBookings);
 router.get('/me/revenue', protectPartner, getMyRevenue);
+
+// Profile
+router.put('/me/profile', protectPartner, updateMyProfile);
+
+// Staff
+router.get('/me/staff', protectPartner, getMyStaff);
+router.post('/me/staff', protectPartner, addMyStaff);
+router.delete('/me/staff/:staffId', protectPartner, removeMyStaff);
+
+// Payouts
+router.get('/me/payouts', protectPartner, getMyPayouts);
+router.post('/me/payouts', protectPartner, requestPayout);
+
+// Pricing Templates
+router.get('/me/pricing-templates', protectPartner, getMyPricingTemplates);
+router.post('/me/pricing-templates', protectPartner, createPricingTemplate);
+router.delete('/me/pricing-templates/:id', protectPartner, deletePricingTemplate);
+
+// Promotions
+router.get('/me/offers', protectPartner, getMyPromotions);
+router.post('/me/offers', protectPartner, createPromotion);
 
 // Admin protected
 router.post('/', protect, createPartner);

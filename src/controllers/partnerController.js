@@ -442,6 +442,145 @@ const getStationAnalytics = async (req, res) => {
   }
 };
 
+// ==========================================
+// NEW DYNAMIC QUICK ACTIONS
+// ==========================================
+
+const PartnerPayout = require('../models/PartnerPayout');
+const PartnerPricingTemplate = require('../models/PartnerPricingTemplate');
+const Offer = require('../models/Offer');
+
+// Profile Update
+const updateMyProfile = async (req, res) => {
+  try {
+    const partner = await Partner.findById(req.partner.id);
+    if (!partner) return res.status(404).json({ success: false, message: 'Partner not found' });
+
+    if (req.body.name) partner.name = req.body.name;
+    if (req.body.phone) partner.phone = req.body.phone;
+    if (req.body.contactPerson) partner.contactPerson = req.body.contactPerson;
+
+    if (req.body.password) {
+      partner.appPassword = req.body.password;
+    }
+
+    await partner.save();
+    res.json({ success: true, message: 'Profile updated successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Staff Management
+const getMyStaff = async (req, res) => {
+  try {
+    const partner = await Partner.findById(req.partner.id);
+    res.json({ success: true, data: partner.staff || [] });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const addMyStaff = async (req, res) => {
+  try {
+    const partner = await Partner.findById(req.partner.id);
+    if (!partner.staff) partner.staff = [];
+    partner.staff.push({
+      name: req.body.name,
+      email: req.body.email,
+      role: req.body.role || 'Operator'
+    });
+    await partner.save();
+    res.json({ success: true, message: 'Staff member added', data: partner.staff });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const removeMyStaff = async (req, res) => {
+  try {
+    const partner = await Partner.findById(req.partner.id);
+    partner.staff = partner.staff.filter(s => s._id.toString() !== req.params.staffId);
+    await partner.save();
+    res.json({ success: true, message: 'Staff member removed' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Payouts
+const getMyPayouts = async (req, res) => {
+  try {
+    const payouts = await PartnerPayout.find({ partner: req.partner.id }).sort('-createdAt');
+    res.json({ success: true, data: payouts });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const requestPayout = async (req, res) => {
+  try {
+    const payout = await PartnerPayout.create({
+      partner: req.partner.id,
+      amount: req.body.amount,
+      bankDetails: req.body.bankDetails,
+    });
+    res.json({ success: true, message: 'Payout requested successfully', data: payout });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Pricing Templates
+const getMyPricingTemplates = async (req, res) => {
+  try {
+    const templates = await PartnerPricingTemplate.find({ partner: req.partner.id }).sort('-createdAt');
+    res.json({ success: true, data: templates });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const createPricingTemplate = async (req, res) => {
+  try {
+    const template = await PartnerPricingTemplate.create({
+      partner: req.partner.id,
+      ...req.body
+    });
+    res.json({ success: true, message: 'Template created', data: template });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const deletePricingTemplate = async (req, res) => {
+  try {
+    await PartnerPricingTemplate.findOneAndDelete({ _id: req.params.id, partner: req.partner.id });
+    res.json({ success: true, message: 'Template deleted' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Promotions/Offers
+const getMyPromotions = async (req, res) => {
+  try {
+    const offers = await Offer.find({ isActive: true }).sort('-createdAt');
+    res.json({ success: true, data: offers });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const createPromotion = async (req, res) => {
+  try {
+    const offer = await Offer.create(req.body);
+    res.json({ success: true, message: 'Promotion created', data: offer });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   createPartner,
   getAllPartners,
@@ -459,4 +598,9 @@ module.exports = {
   addMyStation,
   updateMyStation,
   getStationAnalytics,
+  updateMyProfile,
+  getMyStaff, addMyStaff, removeMyStaff,
+  getMyPayouts, requestPayout,
+  getMyPricingTemplates, createPricingTemplate, deletePricingTemplate,
+  getMyPromotions, createPromotion,
 };

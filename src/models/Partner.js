@@ -12,6 +12,12 @@ const partnerSchema = new mongoose.Schema({
   appUsername: { type: String, trim: true, sparse: true },
   appPassword: { type: String },
   hasCredentials: { type: Boolean, default: false },
+  staff: [{
+    name: String,
+    email: String,
+    role: { type: String, enum: ['Manager', 'Operator', 'Viewer'], default: 'Operator' },
+    addedAt: { type: Date, default: Date.now }
+  }],
 }, { timestamps: true });
 
 partnerSchema.pre('save', async function () {
