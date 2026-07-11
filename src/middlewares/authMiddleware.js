@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
 const User = require('../models/User');
+const Partner = require('../models/Partner');
 
 const protect = async (req, res, next) => {
   if (
@@ -42,4 +43,21 @@ const protectUser = async (req, res, next) => {
   return res.status(401).json({ message: 'Not authorized, no token' });
 };
 
-module.exports = { protect, protectUser };
+const protectPartner = async (req, res, next) => {
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    try {
+      const token = req.headers.authorization.split(' ')[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (decoded.type !== 'partner') return res.status(401).json({ message: 'Not authorized as partner' });
+      req.partner = await Partner.findById(decoded.id).select('-appPassword');
+      if (!req.partner) return res.status(401).json({ message: 'Partner not found' });
+      if (req.partner.status === 'Blocked') return res.status(403).json({ message: 'Your account has been blocked. Contact admin.' });
+      return next();
+    } catch (error) {
+      return res.status(401).json({ message: 'Not authorized, token failed' });
+    }
+  }
+  return res.status(401).json({ message: 'Not authorized, no token' });
+};
+
+module.exports = { protect, protectUser, protectPartner };
