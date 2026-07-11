@@ -28,6 +28,13 @@ const stationSchema = new mongoose.Schema({
   image: { type: String },
   amenities: [{ type: String }],
   openHours: { type: String, default: '24/7' },
+  pricing: {
+    acPrice: { type: Number, default: 18.00 },
+    dcPrice: { type: Number, default: 24.00 },
+    idleFee: { type: Number, default: 2.00 },
+    sessionFee: { type: Number, default: 20.00 },
+    peakPrice: { type: Number, default: 26.00 }
+  }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Station', stationSchema);

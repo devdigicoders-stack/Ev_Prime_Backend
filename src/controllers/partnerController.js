@@ -389,10 +389,54 @@ const updateMyStation = async (req, res) => {
           : req.body.amenities;
       } catch (e) {}
     }
+    if (req.body.pricing !== undefined) {
+      try {
+        station.pricing = typeof req.body.pricing === 'string'
+          ? JSON.parse(req.body.pricing)
+          : req.body.pricing;
+      } catch (e) {}
+    }
     if (req.file) station.image = `/uploads/${req.file.filename}`;
 
     const updated = await station.save();
     res.json({ success: true, data: updated });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Partner: Get specific station analytics
+// @route   GET /api/partner/me/stations/:id/analytics
+// @access  Partner
+const getStationAnalytics = async (req, res) => {
+  try {
+    const station = await Station.findOne({ _id: req.params.id, partner: req.partner.name });
+    if (!station) return res.status(404).json({ success: false, message: 'Station not found or unauthorized' });
+
+    // Calculate analytics from bookings
+    const bookings = await Booking.find({ station: station._id });
+    
+    // Today metrics
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const todayBookings = bookings.filter(b => new Date(b.createdAt) >= today);
+    
+    const todaySessions = todayBookings.length;
+    const todayEnergy = todayBookings.reduce((sum, b) => sum + (b.estimatedEnergy || 0), 0);
+    const todayRevenue = todayBookings.filter(b => b.paymentStatus === 'Paid').reduce((sum, b) => sum + (b.estimatedCost || 0), 0);
+    
+    // Total metrics
+    const totalSessions = bookings.length;
+    const totalEnergy = bookings.reduce((sum, b) => sum + (b.estimatedEnergy || 0), 0);
+    const totalRevenue = bookings.filter(b => b.paymentStatus === 'Paid').reduce((sum, b) => sum + (b.estimatedCost || 0), 0);
+
+    res.json({
+      success: true,
+      data: {
+        today: { sessions: todaySessions, energy: todayEnergy, revenue: todayRevenue },
+        total: { sessions: totalSessions, energy: totalEnergy, revenue: totalRevenue },
+      }
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -414,4 +458,5 @@ module.exports = {
   getMyDashboard,
   addMyStation,
   updateMyStation,
+  getStationAnalytics,
 };
