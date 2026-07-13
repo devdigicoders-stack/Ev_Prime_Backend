@@ -102,6 +102,18 @@ app.get('/', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error('Error:', err.message);
+  if (err.name === 'MulterError' || err.message.includes('not allowed')) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || 'Internal Server Error',
+  });
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });
