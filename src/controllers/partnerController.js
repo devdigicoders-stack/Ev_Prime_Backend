@@ -302,6 +302,7 @@ const getMyDashboard = async (req, res) => {
     const todayRevenue = todayBookings.filter(b => b.paymentStatus === 'Paid').reduce((sum, b) => sum + (b.estimatedCost || 0), 0);
     const totalRevenue = paidBookings.reduce((sum, b) => sum + (b.estimatedCost || 0), 0);
     const activeStations = stations.filter(s => s.status === 'Active').length;
+    const activeSessions = allBookings.filter(b => b.status === 'Confirmed').length;
     const recentBookings = await Booking.find({ station: { $in: stationIds } })
       .populate('user', 'name')
       .populate('station', 'name')
@@ -312,6 +313,7 @@ const getMyDashboard = async (req, res) => {
       data: {
         totalStations: stations.length,
         activeStations,
+        activeSessions,
         totalBookings: allBookings.length,
         todayBookings: todayBookings.length,
         totalRevenue,
