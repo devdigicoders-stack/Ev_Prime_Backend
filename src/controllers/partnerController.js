@@ -691,7 +691,9 @@ const updateMyBookingStatus = async (req, res) => {
     }
 
     const bookingId = req.params.id;
-    const booking = await Booking.findById(bookingId).populate('station');
+    const booking = await Booking.findById(bookingId)
+      .populate('station', 'name location city partner')
+      .populate('user', 'name email mobile phone');
     
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found' });
