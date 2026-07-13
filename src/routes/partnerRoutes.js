@@ -25,6 +25,7 @@ const {
   getMyPayouts, requestPayout,
   getMyPricingTemplates, createPricingTemplate, deletePricingTemplate,
   getMyPromotions, createPromotion,
+  updateMyBookingStatus,
 } = require('../controllers/partnerController');
 const { protect, protectPartner } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
@@ -40,6 +41,7 @@ router.post('/me/stations', protectPartner, upload.single('image'), addMyStation
 router.put('/me/stations/:id', protectPartner, upload.single('image'), updateMyStation);
 router.get('/me/stations/:id/analytics', protectPartner, getStationAnalytics);
 router.get('/me/bookings', protectPartner, getMyBookings);
+router.put('/me/bookings/:id/status', protectPartner, updateMyBookingStatus);
 router.get('/me/revenue', protectPartner, getMyRevenue);
 
 // Profile
