@@ -19,6 +19,8 @@ const {
   getStationAnalytics,
   updateMyProfile,
   uploadDocument,
+  updateDocument,
+  deleteDocument,
   getMyStaff, addMyStaff, removeMyStaff,
   getMyPayouts, requestPayout,
   getMyPricingTemplates, createPricingTemplate, deletePricingTemplate,
@@ -45,6 +47,8 @@ router.put('/me/profile', protectPartner, upload.single('logo'), updateMyProfile
 
 // Documents
 router.post('/me/documents', protectPartner, upload.single('file'), uploadDocument);
+router.put('/me/documents/:id', protectPartner, updateDocument);
+router.delete('/me/documents/:id', protectPartner, deleteDocument);
 
 // Staff
 router.get('/me/staff', protectPartner, getMyStaff);

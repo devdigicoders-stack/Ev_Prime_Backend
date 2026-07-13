@@ -536,6 +536,38 @@ const uploadDocument = async (req, res) => {
   }
 };
 
+const updateDocument = async (req, res) => {
+  try {
+    const partner = await Partner.findById(req.partner.id);
+    if (!partner) return res.status(404).json({ success: false, message: 'Partner not found' });
+
+    const docIndex = partner.documents.findIndex(d => d._id.toString() === req.params.id);
+    if (docIndex === -1) return res.status(404).json({ success: false, message: 'Document not found' });
+
+    if (req.body.title) partner.documents[docIndex].title = req.body.title;
+    if (req.body.category) partner.documents[docIndex].category = req.body.category;
+
+    await partner.save();
+    res.json({ success: true, message: 'Document updated successfully', data: partner.documents });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const deleteDocument = async (req, res) => {
+  try {
+    const partner = await Partner.findById(req.partner.id);
+    if (!partner) return res.status(404).json({ success: false, message: 'Partner not found' });
+
+    partner.documents = partner.documents.filter(d => d._id.toString() !== req.params.id);
+
+    await partner.save();
+    res.json({ success: true, message: 'Document deleted successfully', data: partner.documents });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // Staff Management
 const getMyStaff = async (req, res) => {
   try {
@@ -665,6 +697,8 @@ module.exports = {
   getStationAnalytics,
   updateMyProfile,
   uploadDocument,
+  updateDocument,
+  deleteDocument,
   getMyStaff,
   addMyStaff, removeMyStaff,
   getMyPayouts, requestPayout,
