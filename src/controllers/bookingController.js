@@ -202,7 +202,9 @@ const cancelBooking = async (req, res) => {
       status: 'Pending'
     });
 
-    res.json({ success: true, data: booking, refundAmount });
+    const populated = await Booking.findById(booking._id).populate('station', 'name location city image powerCapacity latitude longitude');
+
+    res.json({ success: true, data: populated, refundAmount });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
