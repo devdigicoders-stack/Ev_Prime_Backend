@@ -31,7 +31,7 @@ const bookingSchema = new mongoose.Schema({
   },
   paymentStatus: {
     type: String,
-    enum: ['Pending', 'Paid', 'Failed', 'Refunded'],
+    enum: ['Pending', 'Paid', 'Failed', 'Refunded', 'Refund Requested'],
     default: 'Pending',
   },
   razorpayOrderId: { type: String },
@@ -46,7 +46,7 @@ const bookingSchema = new mongoose.Schema({
   refundAmount: { type: Number },
   refundStatus: {
     type: String,
-    enum: ['None', 'Initiated', 'Processed'],
+    enum: ['None', 'Initiated', 'Processed', 'Rejected'],
     default: 'None',
   },
   qrCode: { type: String },
