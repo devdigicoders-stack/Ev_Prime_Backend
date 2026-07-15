@@ -5,6 +5,7 @@ const Station = require('../models/Station');
 const Wallet = require('../models/Wallet');
 const User = require('../models/User');
 const Pricing = require('../models/Pricing');
+const Refund = require('../models/Refund');
 const { calculateEffectivePrice } = require('./pricingController');
 const { createInvoiceForBooking } = require('./invoiceController');
 const { calculateCarbon } = require('../utils/carbonCalculator');
@@ -186,21 +187,20 @@ const cancelBooking = async (req, res) => {
     booking.cancellationReason = reason || 'User cancelled';
     booking.refundAmount = refundAmount;
     booking.refundStatus = 'Initiated';
-    booking.paymentStatus = 'Refunded';
-
-    // Refund to wallet
-    let wallet = await Wallet.findOne({ user: req.user._id });
-    if (!wallet) wallet = await Wallet.create({ user: req.user._id, balance: 0, transactions: [] });
-    wallet.balance += refundAmount;
-    wallet.transactions = wallet.transactions || [];
-    wallet.transactions.push({
-      type: 'credit',
-      amount: refundAmount,
-      description: `Refund for booking #${booking.bookingId}`,
-      date: new Date(),
-    });
-    await wallet.save();
+    booking.paymentStatus = 'Refund Requested';
     await booking.save();
+
+    // Create Refund Request
+    const count = await Refund.countDocuments();
+    await Refund.create({
+      refundId: `RF${Date.now().toString().slice(-6)}${count + 1}`,
+      user: req.user._id,
+      booking: booking._id,
+      amount: refundAmount,
+      paymentMethod: booking.paymentMethod || 'wallet',
+      reason: booking.cancellationReason,
+      status: 'Pending'
+    });
 
     res.json({ success: true, data: booking, refundAmount });
   } catch (err) {
