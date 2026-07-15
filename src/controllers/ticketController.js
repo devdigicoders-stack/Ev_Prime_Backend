@@ -14,12 +14,25 @@ const getTickets = async (req, res) => {
     if (search) {
       query.$or = [
         { ticketId: { $regex: search, $options: 'i' } },
-        { subject: { $regex: search, $options: 'i' } },
-        { user: { $regex: search, $options: 'i' } }
+        { subject: { $regex: search, $options: 'i' } }
       ];
     }
 
-    const tickets = await Ticket.find(query).sort({ createdAt: -1 });
+    const tickets = await Ticket.find(query)
+      .populate('user', 'name email mobile')
+      .sort({ createdAt: -1 });
+    res.json(tickets);
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Get logged in user's tickets
+// @route   GET /api/tickets/my
+// @access  User
+const getMyTickets = async (req, res) => {
+  try {
+    const tickets = await Ticket.find({ user: req.user._id }).sort({ createdAt: -1 });
     res.json(tickets);
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
@@ -28,17 +41,17 @@ const getTickets = async (req, res) => {
 
 // @desc    Create a new ticket
 // @route   POST /api/tickets
-// @access  Public / User
+// @access  User
 const createTicket = async (req, res) => {
   try {
-    const { user, subject, category, priority, message } = req.body;
+    const { subject, category, priority, message } = req.body;
 
     const newTicket = new Ticket({
-      user,
+      user: req.user._id,
       subject,
       category,
       priority: priority || 'Medium',
-      messages: message ? [{ sender: 'User', senderName: user, text: message }] : []
+      messages: message ? [{ sender: 'User', senderName: req.user.name || 'User', text: message }] : []
     });
 
     const savedTicket = await newTicket.save();
@@ -50,7 +63,7 @@ const createTicket = async (req, res) => {
 
 // @desc    Update ticket status or add reply
 // @route   PUT /api/tickets/:id
-// @access  Admin
+// @access  Admin & User
 const updateTicket = async (req, res) => {
   try {
     const ticket = await Ticket.findById(req.params.id);
@@ -58,19 +71,32 @@ const updateTicket = async (req, res) => {
       return res.status(404).json({ message: 'Ticket not found' });
     }
 
+    // Check if user is the owner (if not admin)
+    if (req.user && ticket.user.toString() !== req.user._id.toString()) {
+      return res.status(401).json({ message: 'Not authorized' });
+    }
+
     const { status, priority, replyMessage, adminName } = req.body;
 
-    if (status) ticket.status = status;
-    if (priority) ticket.priority = priority;
-    
+    // Only admin should change status or priority
+    if (req.admin) {
+      if (status) ticket.status = status;
+      if (priority) ticket.priority = priority;
+    }
+
     if (replyMessage) {
+      const sender = req.admin ? 'Admin' : 'User';
+      const senderName = req.admin ? (adminName || 'Admin Team') : (req.user ? req.user.name : 'User');
+      
       ticket.messages.push({
-        sender: 'Admin',
-        senderName: adminName || 'Admin Team',
+        sender,
+        senderName,
         text: replyMessage
       });
-      // Optionally auto-update status to In Progress if replied
-      if (ticket.status === 'Open') ticket.status = 'In Progress';
+      
+      // Auto-update status
+      if (req.admin && ticket.status === 'Open') ticket.status = 'In Progress';
+      if (req.user && ticket.status !== 'Closed') ticket.status = 'Open'; // Re-open if user replies
     }
 
     const updatedTicket = await ticket.save();
@@ -99,6 +125,7 @@ const deleteTicket = async (req, res) => {
 
 module.exports = {
   getTickets,
+  getMyTickets,
   createTicket,
   updateTicket,
   deleteTicket

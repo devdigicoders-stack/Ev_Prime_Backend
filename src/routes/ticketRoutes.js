@@ -2,15 +2,18 @@ const express = require('express');
 const router = express.Router();
 const { 
   getTickets, 
+  getMyTickets,
   createTicket, 
   updateTicket, 
   deleteTicket
 } = require('../controllers/ticketController');
 const { protect } = require('../middlewares/authMiddleware');
 
+router.route('/my').get(protect, getMyTickets);
+
 router.route('/')
   .get(protect, getTickets)
-  .post(createTicket); // Often users might create tickets without strict auth in a simple setup, or with user auth.
+  .post(protect, createTicket);
 
 router.route('/:id')
   .put(protect, updateTicket)
