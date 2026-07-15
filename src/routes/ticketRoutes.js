@@ -7,16 +7,16 @@ const {
   updateTicket, 
   deleteTicket
 } = require('../controllers/ticketController');
-const { protect } = require('../middlewares/authMiddleware');
+const { protect, protectUser, protectAdminOrUser } = require('../middlewares/authMiddleware');
 
-router.route('/my').get(protect, getMyTickets);
+router.route('/my').get(protectUser, getMyTickets);
 
 router.route('/')
   .get(protect, getTickets)
-  .post(protect, createTicket);
+  .post(protectUser, createTicket);
 
 router.route('/:id')
-  .put(protect, updateTicket)
+  .put(protectAdminOrUser, updateTicket)
   .delete(protect, deleteTicket);
 
 module.exports = router;
