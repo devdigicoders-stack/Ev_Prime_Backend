@@ -3,57 +3,133 @@ const Station = require('../models/Station');
 const Partner = require('../models/Partner');
 const Payment = require('../models/Payment');
 const AuditLog = require('../models/AuditLog');
+const Booking = require('../models/Booking');
+
+// Helper to calculate percentage growth
+const calculateGrowth = (current, previous) => {
+  if (previous === 0) return current > 0 ? '+100%' : '0%';
+  const diff = current - previous;
+  const percentage = (diff / previous) * 100;
+  const sign = percentage >= 0 ? '+' : '';
+  return `${sign}${percentage.toFixed(1)}%`;
+};
 
 // @desc    Get dashboard analytics
 // @route   GET /api/dashboard
 // @access  Private (Admin)
 const getDashboardData = async (req, res) => {
   try {
-    const totalUsers = await User.countDocuments();
-    const totalStations = await Station.countDocuments();
-    const totalPartners = await Partner.countDocuments();
+    const now = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(now.getDate() - 30);
+    const sixtyDaysAgo = new Date();
+    sixtyDaysAgo.setDate(now.getDate() - 60);
 
-    // Dynamically calculate total revenue from the Payment collection
-    const revenueAgg = await Payment.aggregate([
-      { $match: { status: 'Success' } },
-      { $group: { _id: null, total: { $sum: '$amount' } } }
+    // 1. Basic Stats (Users, Stations, Partners) with Growth
+    const [
+      totalUsers, prevUsers,
+      totalStations, prevStations,
+      totalPartners, prevPartners
+    ] = await Promise.all([
+      User.countDocuments(),
+      User.countDocuments({ createdAt: { $lt: thirtyDaysAgo } }),
+      Station.countDocuments(),
+      Station.countDocuments({ createdAt: { $lt: thirtyDaysAgo } }),
+      Partner.countDocuments(),
+      Partner.countDocuments({ createdAt: { $lt: thirtyDaysAgo } })
     ]);
-    const totalRevenue = revenueAgg.length > 0 ? revenueAgg[0].total : 0;
+
+    const usersGrowth = calculateGrowth(totalUsers, prevUsers);
+    const stationsGrowth = calculateGrowth(totalStations, prevStations);
+    const partnersGrowth = calculateGrowth(totalPartners, prevPartners);
+
+    // 2. Booking Stats (Revenue, Sessions, Energy) with Growth
+    const bookingStats = await Booking.aggregate([
+      {
+        $match: {
+          status: { $in: ['Completed', 'Confirmed'] },
+          paymentStatus: 'Paid'
+        }
+      },
+      {
+        $facet: {
+          currentPeriod: [
+            { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+            { $group: {
+                _id: null,
+                totalRevenue: { $sum: "$estimatedCost" },
+                totalEnergy: { $sum: "$estimatedEnergy" },
+                totalSessions: { $sum: 1 }
+            }}
+          ],
+          previousPeriod: [
+            { $match: { createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo } } },
+            { $group: {
+                _id: null,
+                totalRevenue: { $sum: "$estimatedCost" },
+                totalEnergy: { $sum: "$estimatedEnergy" },
+                totalSessions: { $sum: 1 }
+            }}
+          ],
+          allTime: [
+             { $group: {
+                _id: null,
+                totalRevenue: { $sum: "$estimatedCost" },
+                totalEnergy: { $sum: "$estimatedEnergy" },
+                totalSessions: { $sum: 1 }
+            }}
+          ]
+        }
+      }
+    ]);
+
+    const currentBookings = bookingStats[0].currentPeriod[0] || { totalRevenue: 0, totalEnergy: 0, totalSessions: 0 };
+    const prevBookings = bookingStats[0].previousPeriod[0] || { totalRevenue: 0, totalEnergy: 0, totalSessions: 0 };
+    const allTimeBookings = bookingStats[0].allTime[0] || { totalRevenue: 0, totalEnergy: 0, totalSessions: 0 };
+
+    const totalRevenue = allTimeBookings.totalRevenue;
+    const totalSessions = allTimeBookings.totalSessions;
+    const totalEnergy = Math.floor(allTimeBookings.totalEnergy);
+    const co2Saved = Math.floor((totalEnergy * 0.85) / 1000);
+
+    const prevEnergy = Math.floor(prevBookings.totalEnergy);
+    const prevCO2 = Math.floor((prevEnergy * 0.85) / 1000);
+
+    const revenueGrowth = calculateGrowth(currentBookings.totalRevenue, prevBookings.totalRevenue);
+    const sessionsGrowth = calculateGrowth(currentBookings.totalSessions, prevBookings.totalSessions);
+    const energyGrowth = calculateGrowth(Math.floor(currentBookings.totalEnergy), prevEnergy);
     
-    // Derived real stats
-    // Assume average session cost is ₹250
-    const totalSessions = Math.floor(totalRevenue / 250) + (totalStations * 10); 
-    // Assume ₹18 per kWh
-    const totalEnergy = Math.floor(totalRevenue / 18) + (totalStations * 100); 
-    // Assume 0.85 kg CO2 per kWh
-    const co2Saved = Math.floor((totalEnergy * 0.85) / 1000); 
+    // CO2 Growth is basically the same as Energy growth but calculated for completeness
+    const currentCO2 = Math.floor((Math.floor(currentBookings.totalEnergy) * 0.85) / 1000);
+    const co2Growth = calculateGrowth(currentCO2, prevCO2);
 
     const stats = {
-      totalUsers,
-      totalStations,
-      totalPartners,
-      totalSessions,
-      totalEnergy,
-      co2Saved,
-      totalRevenue,
+      totalUsers, usersGrowth,
+      totalStations, stationsGrowth,
+      totalPartners, partnersGrowth,
+      totalSessions, sessionsGrowth,
+      totalEnergy, energyGrowth,
+      co2Saved, co2Growth,
+      totalRevenue, revenueGrowth,
     };
 
-    // 1. Revenue Overview Data (Line Chart - Last 14 days)
+    // 3. Revenue Overview Data (Line Chart - Last 14 days)
     const fourteenDaysAgo = new Date();
-    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 13);
+    fourteenDaysAgo.setDate(now.getDate() - 13);
     fourteenDaysAgo.setHours(0,0,0,0);
 
-    const dailyRevenue = await Payment.aggregate([
+    const dailyRevenue = await Booking.aggregate([
       { 
         $match: { 
-          status: 'Success',
+          status: { $in: ['Completed', 'Confirmed'] },
+          paymentStatus: 'Paid',
           createdAt: { $gte: fourteenDaysAgo }
         } 
       },
       {
         $group: {
           _id: { $dateToString: { format: "%d %b", date: "$createdAt" } },
-          value: { $sum: "$amount" }
+          value: { $sum: "$estimatedCost" }
         }
       }
     ]);
@@ -67,23 +143,22 @@ const getDashboardData = async (req, res) => {
       revenueData.push({ name, value: record ? record.value : 0 });
     }
 
-    // 2. Energy Consumption Data (Bar Chart - Last 30 days)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
-    thirtyDaysAgo.setHours(0,0,0,0);
+    // 4. Energy Consumption Data (Bar Chart - Last 30 days)
+    const thirtyDaysAgoStart = new Date(thirtyDaysAgo);
+    thirtyDaysAgoStart.setHours(0,0,0,0);
 
-    const dailyEnergy = await Payment.aggregate([
+    const dailyEnergy = await Booking.aggregate([
       { 
         $match: { 
-          status: 'Success',
-          createdAt: { $gte: thirtyDaysAgo }
+          status: { $in: ['Completed', 'Confirmed'] },
+          paymentStatus: 'Paid',
+          createdAt: { $gte: thirtyDaysAgoStart }
         } 
       },
       {
         $group: {
           _id: { $dateToString: { format: "%d %b", date: "$createdAt" } },
-          // Energy = Revenue / 18
-          value: { $sum: { $divide: ["$amount", 18] } } 
+          value: { $sum: "$estimatedEnergy" }
         }
       }
     ]);
@@ -98,12 +173,25 @@ const getDashboardData = async (req, res) => {
       energyData.push({ name, value: record ? Math.floor(record.value) : 0 });
     }
 
-    // 3. Revenue by City (Donut)
-    // Dynamic grouping of stations by city
-    const cityAgg = await Station.aggregate([
-      { $group: { _id: "$city", count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 5 }
+    // 5. Revenue by City (Donut & Top Cities List)
+    const cityAgg = await Booking.aggregate([
+      { $match: { status: { $in: ['Completed', 'Confirmed'] }, paymentStatus: 'Paid' } },
+      {
+        $lookup: {
+          from: 'stations',
+          localField: 'station',
+          foreignField: '_id',
+          as: 'stationDetails'
+        }
+      },
+      { $unwind: "$stationDetails" },
+      { 
+        $group: { 
+          _id: "$stationDetails.city", 
+          revenue: { $sum: "$estimatedCost" } 
+        } 
+      },
+      { $sort: { revenue: -1 } }
     ]);
 
     const colors = ['#8CC63F', '#38BDF8', '#8B5CF6', '#F59E0B', '#9CA3AF'];
@@ -111,9 +199,9 @@ const getDashboardData = async (req, res) => {
     let topCities = [];
     
     if (cityAgg.length > 0) {
-      const mappedTotalStations = cityAgg.reduce((acc, curr) => acc + curr.count, 0);
-      revenueCityData = cityAgg.map((c, i) => {
-        const percentage = ((c.count / mappedTotalStations) * 100).toFixed(1);
+      const mappedTotalRevenue = cityAgg.reduce((acc, curr) => acc + curr.revenue, 0);
+      revenueCityData = cityAgg.slice(0, 5).map((c, i) => {
+        const percentage = mappedTotalRevenue > 0 ? ((c.revenue / mappedTotalRevenue) * 100).toFixed(1) : 0;
         return {
           name: c._id || 'Unknown',
           value: parseFloat(percentage),
@@ -121,45 +209,37 @@ const getDashboardData = async (req, res) => {
         };
       });
 
-      topCities = cityAgg.slice(0, 3).map((c, i) => {
-        const proportion = c.count / totalStations;
-        const rev = Math.floor(totalRevenue * proportion);
+      topCities = cityAgg.slice(0, 5).map((c, i) => {
         return {
           id: i + 1,
           name: c._id || 'Unknown',
-          revenue: `₹${rev.toLocaleString()}`,
-          growth: `+ ${Math.floor(Math.random() * 10 + 10)}%` // Just for visual growth metric
+          revenue: `₹${c.revenue.toLocaleString()}`,
+          growth: `+0%` // Simplified for now since historical city growth requires complex facet
         };
       });
     }
 
-    // 4. Sessions by Connector (Donut)
-    // Dynamic grouping by connector count on Stations
-    const connectorAgg = await Station.aggregate([
-      { $group: { _id: "$connectors", count: { $sum: 1 } } },
+    // 6. Sessions by Connector (Donut)
+    const connectorAgg = await Booking.aggregate([
+      { $match: { status: { $in: ['Completed', 'Confirmed'] } } },
+      { $group: { _id: "$connectorType", count: { $sum: 1 } } },
       { $sort: { count: -1 } }
     ]);
 
     let sessionsConnectorData = [];
     if (connectorAgg.length > 0) {
-      const mappedTotalConnectors = connectorAgg.reduce((acc, curr) => acc + curr.count, 0);
+      const mappedTotalSessions = connectorAgg.reduce((acc, curr) => acc + curr.count, 0);
       sessionsConnectorData = connectorAgg.map((c, i) => {
-        const percentage = ((c.count / mappedTotalConnectors) * 100).toFixed(1);
-        let name = 'Unknown';
-        if (c._id === 1) name = 'AC Type 1';
-        else if (c._id === 2) name = 'AC Type 2';
-        else if (c._id >= 3) name = 'DC CCS2';
-        else name = 'DC CHAdeMO';
-
+        const percentage = mappedTotalSessions > 0 ? ((c.count / mappedTotalSessions) * 100).toFixed(1) : 0;
         return {
-          name: `${name} (${c._id} ports)`,
+          name: c._id || 'Unknown',
           value: parseFloat(percentage),
           color: colors[i % colors.length]
         };
       });
     }
 
-    // 5. Recent Activities
+    // 7. Recent Activities
     const recentLogs = await AuditLog.find().sort({ createdAt: -1 }).limit(5).lean();
     let recentActivities = [];
     if (recentLogs.length > 0) {
@@ -189,21 +269,35 @@ const getDashboardData = async (req, res) => {
         }
       });
     } else {
-      // Fallback if no logs
       recentActivities = [
         { id: 1, title: 'No recent activity', time: 'Just now', iconType: 'Zap', color: 'text-gray-400', bg: 'bg-gray-100' }
       ];
     }
 
-    // Top Stations
-    const stationsList = await Station.find().limit(3).lean();
+    // 8. Top Stations
+    const stationsAgg = await Booking.aggregate([
+      { $match: { status: { $in: ['Completed', 'Confirmed'] }, paymentStatus: 'Paid' } },
+      { $group: { _id: "$station", revenue: { $sum: "$estimatedCost" } } },
+      { $sort: { revenue: -1 } },
+      { $limit: 3 },
+      {
+        $lookup: {
+          from: 'stations',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'stationDetails'
+        }
+      },
+      { $unwind: "$stationDetails" }
+    ]);
+
     let topStations = [];
-    if (stationsList.length > 0) {
-      topStations = stationsList.map((st, i) => ({
+    if (stationsAgg.length > 0) {
+      topStations = stationsAgg.map((st, i) => ({
         id: st._id,
-        name: st.name,
-        revenue: `₹${Math.floor((totalRevenue * (0.05 - i * 0.01))).toLocaleString()}`,
-        growth: `+ ${(15 - i * 2)}%`
+        name: st.stationDetails.name,
+        revenue: `₹${st.revenue.toLocaleString()}`,
+        growth: `+0%` // Simplified
       }));
     }
 
