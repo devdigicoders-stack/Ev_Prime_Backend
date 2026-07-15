@@ -4,6 +4,7 @@ const Partner = require('../models/Partner');
 const Payment = require('../models/Payment');
 const AuditLog = require('../models/AuditLog');
 const Booking = require('../models/Booking');
+const MarketOrder = require('../models/MarketOrder');
 
 // Helper to calculate percentage growth
 const calculateGrowth = (current, previous) => {
@@ -103,6 +104,13 @@ const getDashboardData = async (req, res) => {
     const currentCO2 = Math.floor((Math.floor(currentBookings.totalEnergy) * 0.85) / 1000);
     const co2Growth = calculateGrowth(currentCO2, prevCO2);
 
+    // Market Revenue
+    const marketRevenueAgg = await MarketOrder.aggregate([
+      { $match: { paymentStatus: 'Paid', status: { $ne: 'Cancelled' } } },
+      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+    ]);
+    const marketRevenue = marketRevenueAgg[0]?.total || 0;
+
     const stats = {
       totalUsers, usersGrowth,
       totalStations, stationsGrowth,
@@ -111,6 +119,7 @@ const getDashboardData = async (req, res) => {
       totalEnergy, energyGrowth,
       co2Saved, co2Growth,
       totalRevenue, revenueGrowth,
+      marketRevenue,
     };
 
     // 3. Revenue Overview Data (Line Chart - Last 14 days)
