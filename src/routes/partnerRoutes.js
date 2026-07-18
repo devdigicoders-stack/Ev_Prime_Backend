@@ -21,7 +21,7 @@ const {
   uploadDocument,
   updateDocument,
   deleteDocument,
-  getMyStaff, addMyStaff, removeMyStaff,
+  getMyStaff, addMyStaff, removeMyStaff, updateMyStaff,
   getMyPayouts, requestPayout,
   getMyPricingTemplates, createPricingTemplate, deletePricingTemplate,
   getMyPromotions, createPromotion,
@@ -55,6 +55,7 @@ router.delete('/me/documents/:id', protectPartner, deleteDocument);
 // Staff
 router.get('/me/staff', protectPartner, getMyStaff);
 router.post('/me/staff', protectPartner, addMyStaff);
+router.put('/me/staff/:staffId', protectPartner, updateMyStaff);
 router.delete('/me/staff/:staffId', protectPartner, removeMyStaff);
 
 // Payouts

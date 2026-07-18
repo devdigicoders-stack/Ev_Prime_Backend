@@ -607,6 +607,23 @@ const removeMyStaff = async (req, res) => {
   }
 };
 
+const updateMyStaff = async (req, res) => {
+  try {
+    const partner = await Partner.findById(req.partner.id);
+    const staffIndex = partner.staff.findIndex(s => s._id.toString() === req.params.staffId);
+    if (staffIndex === -1) return res.status(404).json({ success: false, message: 'Staff member not found' });
+
+    if (req.body.name) partner.staff[staffIndex].name = req.body.name;
+    if (req.body.email) partner.staff[staffIndex].email = req.body.email;
+    if (req.body.role) partner.staff[staffIndex].role = req.body.role;
+
+    await partner.save();
+    res.json({ success: true, message: 'Staff member updated', data: partner.staff[staffIndex] });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // Payouts
 const getMyPayouts = async (req, res) => {
   try {
@@ -734,7 +751,7 @@ module.exports = {
   updateDocument,
   deleteDocument,
   getMyStaff,
-  addMyStaff, removeMyStaff,
+  addMyStaff, removeMyStaff, updateMyStaff,
   getMyPayouts, requestPayout,
   getMyPricingTemplates, createPricingTemplate, deletePricingTemplate,
   getMyPromotions, createPromotion,
