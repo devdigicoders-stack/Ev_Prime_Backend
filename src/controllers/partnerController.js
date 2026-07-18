@@ -478,6 +478,7 @@ const updateMyProfile = async (req, res) => {
     if (req.body.name) partner.name = req.body.name;
     if (req.body.phone) partner.phone = req.body.phone;
     if (req.body.contactPerson) partner.contactPerson = req.body.contactPerson;
+    if (req.body.email) partner.email = req.body.email;
 
     if (req.body.gstNumber !== undefined) partner.gstNumber = req.body.gstNumber;
     if (req.body.panNumber !== undefined) partner.panNumber = req.body.panNumber;
