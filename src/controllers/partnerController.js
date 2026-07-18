@@ -251,9 +251,26 @@ const getMyBookings = async (req, res) => {
   try {
     const stations = await Station.find({ partner: req.partner.name });
     const stationIds = stations.map(s => s._id);
-    const { status, limit = 50, page = 1 } = req.query;
+    const { status, dateFilter, limit = 50, page = 1 } = req.query;
     const filter = { station: { $in: stationIds } };
     if (status) filter.status = status;
+
+    if (dateFilter) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (dateFilter === 'Today') {
+        filter.createdAt = { $gte: today };
+      } else if (dateFilter === 'This Week') {
+        const weekAgo = new Date(today);
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        filter.createdAt = { $gte: weekAgo };
+      } else if (dateFilter === 'This Month') {
+        const monthAgo = new Date(today);
+        monthAgo.setMonth(monthAgo.getMonth() - 1);
+        filter.createdAt = { $gte: monthAgo };
+      }
+    }
+
     const bookings = await Booking.find(filter)
       .populate('user', 'name email mobile')
       .populate('station', 'name location city')
