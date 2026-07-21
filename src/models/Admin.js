@@ -33,6 +33,10 @@ const adminSchema = new mongoose.Schema({
   },
   profileImage: {
     type: String
+  },
+  fcmToken: {
+    type: String,
+    default: ''
   }
 }, {
   timestamps: true

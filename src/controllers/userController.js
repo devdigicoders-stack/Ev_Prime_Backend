@@ -3,6 +3,7 @@ const Vehicle = require('../models/Vehicle');
 const Wallet = require('../models/Wallet');
 const Transaction = require('../models/Transaction');
 const jwt = require('jsonwebtoken');
+const notificationService = require('../services/notificationService');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -28,6 +29,14 @@ const registerUser = async (req, res) => {
 
     const user = await User.create({ name, mobile, email });
     
+    // Notify admins
+    await notificationService.sendToAllAdmins(
+      'New User Registered',
+      `${name} (${mobile}) has just joined the platform.`,
+      { userId: user._id.toString() },
+      'alert'
+    );
+
     res.status(201).json({
       _id: user._id,
       name: user.name,

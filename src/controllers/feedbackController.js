@@ -1,4 +1,5 @@
 const Feedback = require('../models/Feedback');
+const notificationService = require('../services/notificationService');
 
 // Submit feedback
 const submitFeedback = async (req, res) => {
@@ -12,6 +13,14 @@ const submitFeedback = async (req, res) => {
       productId: productId || null,
       orderId: orderId || null,
     });
+
+    // Notify admins
+    await notificationService.sendToAllAdmins(
+      'New Feedback Received',
+      `${req.user?.name || 'User'} left a ${rating}-star rating: ${title || 'Feedback'}`,
+      { feedbackId: feedback._id.toString() },
+      'general'
+    );
 
     res.status(201).json({ success: true, data: feedback });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }

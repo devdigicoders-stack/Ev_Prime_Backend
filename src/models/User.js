@@ -44,6 +44,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  fcmToken: {
+    type: String,
+    default: ''
+  },
   totalCarbonSavedKg: { type: Number, default: 0 },
   totalFuelSavedLiters: { type: Number, default: 0 },
   totalEnergyConsumedKwh: { type: Number, default: 0 },

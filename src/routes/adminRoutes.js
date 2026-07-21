@@ -5,7 +5,11 @@ const {
   loginAdmin,
   getAdminProfile,
   updateAdminProfile,
-  changePassword
+  changePassword,
+  sendCustomNotification,
+  updateFcmToken,
+  getAdminNotifications,
+  markNotificationsRead
 } = require('../controllers/adminController');
 const { protect } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
@@ -16,5 +20,13 @@ router.route('/profile')
   .get(protect, getAdminProfile)
   .put(protect, upload.single('profileImage'), updateAdminProfile);
 router.put('/change-password', protect, changePassword);
+
+// FCM Token
+router.post('/update-fcm-token', protect, updateFcmToken);
+
+// Notifications
+router.get('/notifications', protect, getAdminNotifications);
+router.put('/notifications/read', protect, markNotificationsRead);
+router.post('/notifications/send', protect, sendCustomNotification);
 
 module.exports = router;

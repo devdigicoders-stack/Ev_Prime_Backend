@@ -9,6 +9,7 @@ const Refund = require('../models/Refund');
 const { calculateEffectivePrice } = require('./pricingController');
 const { createInvoiceForBooking } = require('./invoiceController');
 const { calculateCarbon } = require('../utils/carbonCalculator');
+const notificationService = require('../services/notificationService');
 
 const getRazorpay = () => new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
@@ -126,6 +127,14 @@ const createBooking = async (req, res) => {
 
     const populated = await Booking.findById(newBooking._id).populate('station', 'name location city image powerCapacity');
 
+    // Notify admins
+    await notificationService.sendToAllAdmins(
+      'New Booking Created',
+      `Booking ${newBooking.bookingId} created for ${populated.station?.name || 'Station'}.`,
+      { bookingId: newBooking._id.toString() },
+      'booking'
+    );
+
     res.status(201).json({ success: true, data: populated });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -203,6 +212,14 @@ const cancelBooking = async (req, res) => {
     });
 
     const populated = await Booking.findById(booking._id).populate('station', 'name location city image powerCapacity latitude longitude');
+
+    // Notify admins
+    await notificationService.sendToAllAdmins(
+      'Booking Cancelled',
+      `Booking ${booking.bookingId} was cancelled. Refund initiated: ₹${refundAmount.toFixed(2)}.`,
+      { bookingId: booking._id.toString() },
+      'alert'
+    );
 
     res.json({ success: true, data: populated, refundAmount });
   } catch (err) {

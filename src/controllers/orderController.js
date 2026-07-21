@@ -3,6 +3,7 @@ const Product = require('../models/Product');
 const Wallet = require('../models/Wallet');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
+const notificationService = require('../services/notificationService');
 
 const getRazorpay = () => new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
@@ -86,6 +87,14 @@ const placeOrder = async (req, res) => {
       status: 'Confirmed',
     });
 
+    // Notify admins
+    await notificationService.sendToAllAdmins(
+      'New Marketplace Order',
+      `Order ${order.orderId} for ₹${totalAmount.toFixed(2)} placed successfully.`,
+      { orderId: order._id.toString() },
+      'promo'
+    );
+
     res.status(201).json({ success: true, data: order });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -129,6 +138,15 @@ const cancelOrder = async (req, res) => {
       await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.qty } });
     }
     await order.save();
+
+    // Notify admins
+    await notificationService.sendToAllAdmins(
+      'Marketplace Order Cancelled',
+      `Order ${order.orderId} was cancelled by the user.`,
+      { orderId: order._id.toString() },
+      'alert'
+    );
+
     res.json({ success: true, data: order });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

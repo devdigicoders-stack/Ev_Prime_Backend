@@ -1,5 +1,9 @@
 const Admin = require('../models/Admin');
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+const AdminNotification = require('../models/AdminNotification');
+const notificationService = require('../services/notificationService');
+const mongoose = require('mongoose');
 
 // Generate JWT
 const generateToken = (id) => {
@@ -158,10 +162,98 @@ const changePassword = async (req, res) => {
   }
 };
 
+// @desc    Send custom notification to users
+// @route   POST /api/admin/notifications/send
+// @access  Private (Admin)
+const sendCustomNotification = async (req, res) => {
+  try {
+    const { title, body, type, userId } = req.body;
+
+    if (!title || !body) {
+      return res.status(400).json({ message: 'Title and body are required' });
+    }
+
+    if (userId && userId.trim() !== '') {
+      if (!mongoose.Types.ObjectId.isValid(userId.trim())) {
+        return res.status(400).json({ message: 'Invalid Target User ID. Please provide a valid ID or leave it empty.' });
+      }
+      
+      // Send to specific user
+      const result = await notificationService.sendToUser(userId.trim(), title, body, {}, type || 'alert');
+      return res.json({ message: 'Notification sent successfully', result });
+    } else {
+      // Send to all users
+      const users = await User.find({}).select('_id');
+      const userIds = users.map(u => u._id);
+      const result = await notificationService.sendToMultipleUsers(userIds, title, body, {}, type || 'alert');
+      return res.json({ message: 'Notifications sent successfully to all users', result });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Update FCM Token for admin
+// @route   POST /api/admin/update-fcm-token
+// @access  Private
+const updateFcmToken = async (req, res) => {
+  try {
+    const { fcmToken } = req.body;
+    if (!fcmToken) {
+      return res.status(400).json({ message: 'fcmToken is required' });
+    }
+
+    const admin = await Admin.findById(req.admin._id);
+    if (!admin) {
+      return res.status(404).json({ message: 'Admin not found' });
+    }
+
+    admin.fcmToken = fcmToken;
+    await admin.save();
+    res.json({ message: 'FCM token updated successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get admin notifications
+// @route   GET /api/admin/notifications
+// @access  Private
+const getAdminNotifications = async (req, res) => {
+  try {
+    const notifications = await AdminNotification.find().sort({ createdAt: -1 }).limit(100);
+    const unreadCount = await AdminNotification.countDocuments({ isRead: false });
+    res.json({ success: true, data: notifications, unreadCount });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Mark admin notifications as read
+// @route   PUT /api/admin/notifications/read
+// @access  Private
+const markNotificationsRead = async (req, res) => {
+  try {
+    const { notificationIds } = req.body;
+    if (notificationIds && notificationIds.length > 0) {
+      await AdminNotification.updateMany({ _id: { $in: notificationIds } }, { isRead: true });
+    } else {
+      await AdminNotification.updateMany({ isRead: false }, { isRead: true });
+    }
+    res.json({ success: true, message: 'Notifications marked as read' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   registerAdmin,
   loginAdmin,
   getAdminProfile,
   updateAdminProfile,
-  changePassword
+  changePassword,
+  sendCustomNotification,
+  updateFcmToken,
+  getAdminNotifications,
+  markNotificationsRead
 };
