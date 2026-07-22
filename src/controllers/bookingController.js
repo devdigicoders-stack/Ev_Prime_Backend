@@ -190,7 +190,7 @@ const getBookingById = async (req, res) => {
 // @access User
 const cancelBooking = async (req, res) => {
   try {
-    const { reason } = req.body;
+    const { reason, refundDestination, bankDetails, upiDetails } = req.body;
     const booking = await Booking.findOne({ _id: req.params.id, user: req.user._id });
 
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
@@ -216,6 +216,9 @@ const cancelBooking = async (req, res) => {
       booking: booking._id,
       amount: refundAmount,
       paymentMethod: booking.paymentMethod || 'wallet',
+      refundDestination: refundDestination || 'wallet',
+      bankDetails: bankDetails || undefined,
+      upiDetails: upiDetails || undefined,
       reason: booking.cancellationReason,
       status: 'Pending'
     });

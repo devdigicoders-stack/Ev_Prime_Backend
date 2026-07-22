@@ -75,7 +75,7 @@ const updateRefundStatus = async (req, res) => {
       return res.status(400).json({ message: 'Refund is already processed' });
     }
 
-    if (status === 'Approved') {
+      if (status === 'Approved') {
       const booking = await Booking.findById(refund.booking);
       if (booking) {
         booking.refundStatus = 'Processed';
@@ -83,7 +83,8 @@ const updateRefundStatus = async (req, res) => {
         await booking.save();
       }
 
-      if (refund.paymentMethod === 'wallet') {
+      // Automatically add to wallet ONLY if refundDestination is 'wallet'
+      if (refund.refundDestination === 'wallet' || (!refund.refundDestination && refund.paymentMethod === 'wallet')) {
         let wallet = await Wallet.findOne({ user: refund.user });
         if (!wallet) wallet = await Wallet.create({ user: refund.user, balance: 0, transactions: [] });
         

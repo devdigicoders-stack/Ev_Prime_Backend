@@ -35,6 +35,19 @@ const refundSchema = new mongoose.Schema({
     type: String,
     enum: ['Approved', 'Pending', 'Rejected'],
     default: 'Pending',
+  },
+  refundDestination: {
+    type: String,
+    enum: ['wallet', 'bank_transfer', 'upi'],
+    default: 'wallet'
+  },
+  bankDetails: {
+    accountName: String,
+    accountNumber: String,
+    ifsc: String,
+  },
+  upiDetails: {
+    upiId: String,
   }
 }, { timestamps: true });
 
