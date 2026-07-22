@@ -4,6 +4,7 @@ const Booking = require('../models/Booking');
 const jwt = require('jsonwebtoken');
 const { createAuditLog } = require('./auditController');
 const notificationService = require('../services/notificationService');
+const PartnerNotification = require('../models/PartnerNotification');
 
 // @desc    Create a new partner
 // @route   POST /api/partner
@@ -326,6 +327,8 @@ const getMyDashboard = async (req, res) => {
       .populate('station', 'name')
       .sort({ createdAt: -1 })
       .limit(5);
+    const unreadNotificationsCount = await PartnerNotification.countDocuments({ partner: req.partner._id, isRead: false });
+
     res.json({
       success: true,
       data: {
@@ -337,6 +340,7 @@ const getMyDashboard = async (req, res) => {
         totalRevenue,
         todayRevenue,
         recentBookings,
+        unreadNotificationsCount,
       }
     });
   } catch (error) {
@@ -799,6 +803,35 @@ const updateFcmToken = async (req, res) => {
   }
 };
 
+// @desc    Get partner notifications
+// @route   GET /api/partner/me/notifications
+// @access  Partner
+const getMyNotifications = async (req, res) => {
+  try {
+    const notifications = await PartnerNotification.find({ partner: req.partner._id })
+      .sort({ createdAt: -1 })
+      .limit(50);
+    res.json({ success: true, data: notifications });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Mark partner notifications as read
+// @route   PUT /api/partner/me/notifications/read
+// @access  Partner
+const markNotificationsRead = async (req, res) => {
+  try {
+    await PartnerNotification.updateMany(
+      { partner: req.partner._id, isRead: false },
+      { $set: { isRead: true } }
+    );
+    res.json({ success: true, message: 'Notifications marked as read' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createPartner,
   getAllPartners,
@@ -830,5 +863,7 @@ module.exports = {
   getMyPromotions,
   createPromotion,
   updateMyBookingStatus,
-  updateFcmToken
+  updateFcmToken,
+  getMyNotifications,
+  markNotificationsRead
 };
