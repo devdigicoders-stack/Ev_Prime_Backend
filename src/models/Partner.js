@@ -12,6 +12,7 @@ const partnerSchema = new mongoose.Schema({
   appUsername: { type: String, trim: true, sparse: true },
   appPassword: { type: String },
   hasCredentials: { type: Boolean, default: false },
+  fcmToken: { type: String, trim: true },
   
   // Business Information
   gstNumber: { type: String, trim: true },

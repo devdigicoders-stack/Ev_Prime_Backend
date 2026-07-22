@@ -4,6 +4,8 @@ const Notification = require('../models/Notification');
 const User = require('../models/User');
 const Admin = require('../models/Admin');
 const AdminNotification = require('../models/AdminNotification');
+const Partner = require('../models/Partner');
+const PartnerNotification = require('../models/PartnerNotification');
 
 class NotificationService {
   /**
@@ -152,6 +154,58 @@ class NotificationService {
     } catch (error) {
       console.error('Error sending notification to users:', error);
       return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Send a push notification to a specific partner and save it in the database.
+   * @param {String} partnerId - The ID of the partner.
+   * @param {String} title - Notification title.
+   * @param {String} body - Notification body.
+   * @param {Object} data - Additional data payload.
+   * @param {String} type - Notification type (e.g., 'booking', 'payout').
+   */
+  async sendToPartner(partnerId, title, body, data = {}, type = 'general') {
+    try {
+      // 1. Save to Database
+      const notification = new PartnerNotification({
+        partner: partnerId,
+        title,
+        body,
+        data,
+        type
+      });
+      await notification.save();
+
+      // 2. Fetch Partner to get FCM Token
+      const partner = await Partner.findById(partnerId);
+      if (!partner || !partner.fcmToken) {
+        console.log(`Partner ${partnerId} not found or has no FCM token. Notification saved to DB only.`);
+        return { success: true, savedToDb: true, pushSent: false };
+      }
+
+      // 3. Send Push Notification via Firebase
+      if (getApps().length > 0) {
+        const message = {
+          notification: {
+            title,
+            body
+          },
+          data: {
+            ...data,
+            type
+          },
+          token: partner.fcmToken
+        };
+
+        const response = await getMessaging().send(message);
+        console.log('Successfully sent message to partner:', response);
+        return { success: true, savedToDb: true, pushSent: true, response };
+      }
+      return { success: true, savedToDb: true, pushSent: false, reason: 'Firebase not initialized' };
+    } catch (error) {
+      console.error('Error sending notification to partner:', error);
+      return { success: false, savedToDb: false, error: error.message };
     }
   }
 }

@@ -775,6 +775,30 @@ const updateMyBookingStatus = async (req, res) => {
   }
 };
 
+// @desc  Update Partner FCM Token
+// @route PUT /api/partner/me/fcm-token
+// @access Partner
+const updateFcmToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'FCM token is required' });
+    }
+
+    const partner = await Partner.findById(req.partner.id);
+    if (!partner) {
+      return res.status(404).json({ success: false, message: 'Partner not found' });
+    }
+
+    partner.fcmToken = token;
+    await partner.save();
+
+    res.json({ success: true, message: 'FCM token updated successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   createPartner,
   getAllPartners,
@@ -799,7 +823,12 @@ module.exports = {
   getMyStaff,
   addMyStaff, removeMyStaff, updateMyStaff,
   getMyPayouts, requestPayout,
-  getMyPricingTemplates, createPricingTemplate, updatePricingTemplate, deletePricingTemplate,
-  getMyPromotions, createPromotion,
+  getMyPricingTemplates,
+  createPricingTemplate,
+  updatePricingTemplate,
+  deletePricingTemplate,
+  getMyPromotions,
+  createPromotion,
   updateMyBookingStatus,
+  updateFcmToken
 };

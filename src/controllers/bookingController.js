@@ -125,7 +125,7 @@ const createBooking = async (req, res) => {
 
     await newBooking.save();
 
-    const populated = await Booking.findById(newBooking._id).populate('station', 'name location city image powerCapacity');
+    const populated = await Booking.findById(newBooking._id).populate('station', 'name location city image powerCapacity partner');
 
     // Notify admins
     await notificationService.sendToAllAdmins(
@@ -134,6 +134,17 @@ const createBooking = async (req, res) => {
       { bookingId: newBooking._id.toString() },
       'booking'
     );
+
+    // Notify Partner
+    if (populated.station?.partner) {
+      await notificationService.sendToPartner(
+        populated.station.partner.toString(),
+        'New Booking Received! ⚡',
+        `A new booking (${newBooking.bookingId}) has been placed for ${populated.station.name}.`,
+        { bookingId: newBooking._id.toString() },
+        'booking'
+      );
+    }
 
     // Notify User
     await notificationService.sendToUser(

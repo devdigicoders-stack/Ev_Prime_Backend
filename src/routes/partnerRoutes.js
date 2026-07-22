@@ -26,6 +26,7 @@ const {
   getMyPricingTemplates, createPricingTemplate, updatePricingTemplate, deletePricingTemplate,
   getMyPromotions, createPromotion,
   updateMyBookingStatus,
+  updateFcmToken
 } = require('../controllers/partnerController');
 const { protect, protectPartner } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
@@ -80,5 +81,8 @@ router.delete('/:id', protect, deletePartner);
 router.post('/:id/credentials', protect, setPartnerCredentials);
 router.put('/:id/change-password', protect, changePartnerPassword);
 router.get('/:id/history', protect, getPartnerHistory);
+
+// Push Notifications
+router.put('/me/fcm-token', protectPartner, updateFcmToken);
 
 module.exports = router;
