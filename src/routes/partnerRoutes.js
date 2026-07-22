@@ -23,7 +23,7 @@ const {
   deleteDocument,
   getMyStaff, addMyStaff, removeMyStaff, updateMyStaff,
   getMyPayouts, requestPayout,
-  getMyPricingTemplates, createPricingTemplate, deletePricingTemplate,
+  getMyPricingTemplates, createPricingTemplate, updatePricingTemplate, deletePricingTemplate,
   getMyPromotions, createPromotion,
   updateMyBookingStatus,
 } = require('../controllers/partnerController');
