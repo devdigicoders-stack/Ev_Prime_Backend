@@ -13,7 +13,9 @@ const {
   markNotificationsRead,
   getBroadcastHistory,
   deleteBroadcast,
-  resendBroadcast
+  resendBroadcast,
+  getAllPayouts,
+  updatePayoutStatus
 } = require('../controllers/adminController');
 const { protect } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
@@ -38,5 +40,9 @@ router.post('/notifications/send', protect, sendCustomNotification);
 router.get('/notifications/broadcasts', protect, getBroadcastHistory);
 router.delete('/notifications/broadcasts/:id', protect, deleteBroadcast);
 router.post('/notifications/broadcasts/:id/resend', protect, resendBroadcast);
+
+// Payouts
+router.get('/payouts', protect, getAllPayouts);
+router.put('/payouts/:id/status', protect, updatePayoutStatus);
 
 module.exports = router;

@@ -3,6 +3,7 @@ const Station = require('../models/Station');
 const Booking = require('../models/Booking');
 const jwt = require('jsonwebtoken');
 const { createAuditLog } = require('./auditController');
+const notificationService = require('../services/notificationService');
 
 // @desc    Create a new partner
 // @route   POST /api/partner
@@ -659,6 +660,17 @@ const requestPayout = async (req, res) => {
       amount: req.body.amount,
       bankDetails: req.body.bankDetails,
     });
+    
+    const partner = await Partner.findById(req.partner.id);
+    if (partner) {
+      await notificationService.sendToAllAdmins(
+        'New Payout Request 💰',
+        `Partner ${partner.name} has requested a withdrawal of ₹${req.body.amount}`,
+        { type: 'payout', payoutId: payout._id.toString() },
+        'alert'
+      );
+    }
+    
     res.json({ success: true, message: 'Payout requested successfully', data: payout });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const AdminNotification = require('../models/AdminNotification');
 const AdminBroadcast = require('../models/AdminBroadcast');
+const PartnerPayout = require('../models/PartnerPayout');
 const notificationService = require('../services/notificationService');
 const mongoose = require('mongoose');
 
@@ -311,6 +312,31 @@ const markNotificationsRead = async (req, res) => {
   }
 };
 
+const getAllPayouts = async (req, res) => {
+  try {
+    const payouts = await PartnerPayout.find().populate('partner', 'name email phone').sort('-createdAt');
+    res.json({ success: true, data: payouts });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const updatePayoutStatus = async (req, res) => {
+  try {
+    const { status, remarks } = req.body; // status can be 'Approved' or 'Rejected'
+    const payout = await PartnerPayout.findById(req.params.id);
+    if (!payout) return res.status(404).json({ success: false, message: 'Payout request not found' });
+    
+    payout.status = status;
+    if (remarks) payout.remarks = remarks;
+    await payout.save();
+    
+    res.json({ success: true, message: `Payout request ${status}`, data: payout });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   registerAdmin,
   loginAdmin,
@@ -324,5 +350,7 @@ module.exports = {
   markNotificationsRead,
   getBroadcastHistory,
   deleteBroadcast,
-  resendBroadcast
+  resendBroadcast,
+  getAllPayouts,
+  updatePayoutStatus
 };
