@@ -10,7 +10,10 @@ const {
   updateFcmToken,
   removeFcmToken,
   getAdminNotifications,
-  markNotificationsRead
+  markNotificationsRead,
+  getBroadcastHistory,
+  deleteBroadcast,
+  resendBroadcast
 } = require('../controllers/adminController');
 const { protect } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
@@ -30,5 +33,10 @@ router.delete('/fcm-token', protect, removeFcmToken);
 router.get('/notifications', protect, getAdminNotifications);
 router.put('/notifications/read', protect, markNotificationsRead);
 router.post('/notifications/send', protect, sendCustomNotification);
+
+// Broadcast History
+router.get('/notifications/broadcasts', protect, getBroadcastHistory);
+router.delete('/notifications/broadcasts/:id', protect, deleteBroadcast);
+router.post('/notifications/broadcasts/:id/resend', protect, resendBroadcast);
 
 module.exports = router;

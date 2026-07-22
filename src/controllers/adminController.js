@@ -2,6 +2,7 @@ const Admin = require('../models/Admin');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const AdminNotification = require('../models/AdminNotification');
+const AdminBroadcast = require('../models/AdminBroadcast');
 const notificationService = require('../services/notificationService');
 const mongoose = require('mongoose');
 
@@ -180,13 +181,63 @@ const sendCustomNotification = async (req, res) => {
       
       // Send to specific user
       const result = await notificationService.sendToUser(userId.trim(), title, body, {}, type || 'alert');
+      
+      await AdminBroadcast.create({ title, body, type: type || 'alert', targetUserId: userId.trim() });
       return res.json({ message: 'Notification sent successfully', result });
     } else {
       // Send to all users
       const users = await User.find({}).select('_id');
       const userIds = users.map(u => u._id);
       const result = await notificationService.sendToMultipleUsers(userIds, title, body, {}, type || 'alert');
+      
+      await AdminBroadcast.create({ title, body, type: type || 'alert' });
       return res.json({ message: 'Notifications sent successfully to all users', result });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get broadcast history
+// @route   GET /api/admin/notifications/broadcasts
+// @access  Private (Admin)
+const getBroadcastHistory = async (req, res) => {
+  try {
+    const broadcasts = await AdminBroadcast.find({}).populate('targetUserId', 'name email').sort({ createdAt: -1 });
+    res.json(broadcasts);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Delete a broadcast from history
+// @route   DELETE /api/admin/notifications/broadcasts/:id
+// @access  Private (Admin)
+const deleteBroadcast = async (req, res) => {
+  try {
+    await AdminBroadcast.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Broadcast deleted' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Resend a broadcast
+// @route   POST /api/admin/notifications/broadcasts/:id/resend
+// @access  Private (Admin)
+const resendBroadcast = async (req, res) => {
+  try {
+    const broadcast = await AdminBroadcast.findById(req.params.id);
+    if (!broadcast) return res.status(404).json({ message: 'Broadcast not found' });
+
+    if (broadcast.targetUserId) {
+      const result = await notificationService.sendToUser(broadcast.targetUserId, broadcast.title, broadcast.body, {}, broadcast.type);
+      res.json({ message: 'Resent to specific user', result });
+    } else {
+      const users = await User.find({}).select('_id');
+      const userIds = users.map(u => u._id);
+      const result = await notificationService.sendToMultipleUsers(userIds, broadcast.title, broadcast.body, {}, broadcast.type);
+      res.json({ message: 'Resent to all users', result });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -270,5 +321,8 @@ module.exports = {
   updateFcmToken,
   removeFcmToken,
   getAdminNotifications,
-  markNotificationsRead
+  markNotificationsRead,
+  getBroadcastHistory,
+  deleteBroadcast,
+  resendBroadcast
 };
