@@ -1,4 +1,5 @@
 const Station = require('../models/Station');
+const notificationService = require('../services/notificationService');
 
 // @desc    Create a new station
 // @route   POST /api/station
@@ -31,6 +32,15 @@ const createStation = async (req, res) => {
     if (req.file) stationData.image = `/uploads/${req.file.filename}`;
 
     const station = await Station.create(stationData);
+
+    // Notify all users about the new station
+    await notificationService.sendToAllUsers(
+      'New Charging Station! 🔋',
+      `${station.name} is now live in ${station.city}. Charge up your EV now!`,
+      { stationId: station._id.toString() },
+      'promo'
+    );
+
     res.status(201).json(station);
   } catch (error) {
     res.status(500).json({ message: error.message });

@@ -216,6 +216,20 @@ const updateFcmToken = async (req, res) => {
   }
 };
 
+// @desc    Remove FCM Token for admin on logout
+// @route   DELETE /api/admin/fcm-token
+// @access  Private
+const removeFcmToken = async (req, res) => {
+  try {
+    await Admin.findByIdAndUpdate(req.admin._id, {
+      $unset: { fcmToken: 1 }
+    });
+    res.json({ success: true, message: 'FCM token removed successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Get admin notifications
 // @route   GET /api/admin/notifications
 // @access  Private
@@ -254,6 +268,7 @@ module.exports = {
   changePassword,
   sendCustomNotification,
   updateFcmToken,
+  removeFcmToken,
   getAdminNotifications,
   markNotificationsRead
 };

@@ -8,6 +8,7 @@ const {
   changePassword,
   sendCustomNotification,
   updateFcmToken,
+  removeFcmToken,
   getAdminNotifications,
   markNotificationsRead
 } = require('../controllers/adminController');
@@ -23,6 +24,7 @@ router.put('/change-password', protect, changePassword);
 
 // FCM Token
 router.post('/update-fcm-token', protect, updateFcmToken);
+router.delete('/fcm-token', protect, removeFcmToken);
 
 // Notifications
 router.get('/notifications', protect, getAdminNotifications);

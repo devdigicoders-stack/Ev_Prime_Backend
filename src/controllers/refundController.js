@@ -2,6 +2,7 @@ const Refund = require('../models/Refund');
 const Booking = require('../models/Booking');
 const Wallet = require('../models/Wallet');
 const { createAuditLog } = require('./auditController');
+const notificationService = require('../services/notificationService');
 
 // @desc    Create a new refund request (For Testing/App)
 // @route   POST /api/refund
@@ -96,6 +97,15 @@ const updateRefundStatus = async (req, res) => {
         });
         await wallet.save();
       }
+
+      // Notify User
+      await notificationService.sendToUser(
+        refund.user,
+        'Refund Approved 💰',
+        `Your refund of ₹${refund.amount.toFixed(2)} for ${refund.refundId} has been approved.`,
+        { refundId: refund._id.toString() },
+        'wallet'
+      );
     } else if (status === 'Rejected') {
       const booking = await Booking.findById(refund.booking);
       if (booking) {

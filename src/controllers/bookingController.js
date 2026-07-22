@@ -135,6 +135,15 @@ const createBooking = async (req, res) => {
       'booking'
     );
 
+    // Notify User
+    await notificationService.sendToUser(
+      req.user._id,
+      'Booking Confirmed! ⚡',
+      `Your booking ${newBooking.bookingId} at ${populated.station?.name || 'Station'} is confirmed.`,
+      { bookingId: newBooking._id.toString() },
+      'booking'
+    );
+
     res.status(201).json({ success: true, data: populated });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -217,6 +226,15 @@ const cancelBooking = async (req, res) => {
     await notificationService.sendToAllAdmins(
       'Booking Cancelled',
       `Booking ${booking.bookingId} was cancelled. Refund initiated: ₹${refundAmount.toFixed(2)}.`,
+      { bookingId: booking._id.toString() },
+      'alert'
+    );
+
+    // Notify User
+    await notificationService.sendToUser(
+      req.user._id,
+      'Booking Cancelled 🚫',
+      `Your booking ${booking.bookingId} was cancelled. Refund of ₹${refundAmount.toFixed(2)} has been initiated.`,
       { bookingId: booking._id.toString() },
       'alert'
     );

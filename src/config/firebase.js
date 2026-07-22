@@ -1,4 +1,4 @@
-const admin = require('firebase-admin');
+const { initializeApp, cert, getApps } = require('firebase-admin/app');
 
 function initializeFirebase() {
   try {
@@ -14,9 +14,9 @@ function initializeFirebase() {
       privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
     };
 
-    if (!admin.apps.length) {
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
+    if (getApps().length === 0) {
+      initializeApp({
+        credential: cert(serviceAccount)
       });
       console.log('Firebase Admin initialized successfully.');
     }
@@ -27,5 +27,5 @@ function initializeFirebase() {
 
 module.exports = {
   initializeFirebase,
-  admin
+  getApps
 };
