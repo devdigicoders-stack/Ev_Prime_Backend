@@ -687,6 +687,22 @@ const createPricingTemplate = async (req, res) => {
   }
 };
 
+const updatePricingTemplate = async (req, res) => {
+  try {
+    const template = await PartnerPricingTemplate.findOneAndUpdate(
+      { _id: req.params.id, partner: req.partner.id },
+      { $set: req.body },
+      { new: true, runValidators: true }
+    );
+    if (!template) {
+      return res.status(404).json({ success: false, message: 'Template not found' });
+    }
+    res.json({ success: true, message: 'Template updated', data: template });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 const deletePricingTemplate = async (req, res) => {
   try {
     await PartnerPricingTemplate.findOneAndDelete({ _id: req.params.id, partner: req.partner.id });
@@ -771,7 +787,7 @@ module.exports = {
   getMyStaff,
   addMyStaff, removeMyStaff, updateMyStaff,
   getMyPayouts, requestPayout,
-  getMyPricingTemplates, createPricingTemplate, deletePricingTemplate,
+  getMyPricingTemplates, createPricingTemplate, updatePricingTemplate, deletePricingTemplate,
   getMyPromotions, createPromotion,
   updateMyBookingStatus,
 };

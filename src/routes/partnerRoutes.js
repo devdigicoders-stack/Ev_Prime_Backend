@@ -65,6 +65,7 @@ router.post('/me/payouts', protectPartner, requestPayout);
 // Pricing Templates
 router.get('/me/pricing-templates', protectPartner, getMyPricingTemplates);
 router.post('/me/pricing-templates', protectPartner, createPricingTemplate);
+router.put('/me/pricing-templates/:id', protectPartner, updatePricingTemplate);
 router.delete('/me/pricing-templates/:id', protectPartner, deletePricingTemplate);
 
 // Promotions
