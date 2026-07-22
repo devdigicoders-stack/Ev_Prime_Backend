@@ -340,7 +340,7 @@ const updateBookingStatusAdmin = async (req, res) => {
 
         await Booking.findByIdAndUpdate(booking._id, { carbonSavedKg, treesEquivalent, fuelSavedLiters });
 
-        await User.findByIdAndUpdate(booking.user, {
+        await User.findByIdAndUpdate(booking.user._id, {
           $inc: {
             totalCarbonSavedKg: carbonSavedKg,
             totalFuelSavedLiters: fuelSavedLiters,
@@ -350,6 +350,19 @@ const updateBookingStatusAdmin = async (req, res) => {
         });
       } catch (err) {
         console.error('Carbon calc error:', err.message);
+      }
+
+      // Notify User
+      try {
+        await notificationService.sendToUser(
+          booking.user._id,
+          'Booking Completed! ✅',
+          `Your charging session for booking ${booking.bookingId} has been successfully completed.`,
+          { bookingId: booking._id.toString() },
+          'booking'
+        );
+      } catch (err) {
+        console.error('Completion notification error:', err.message);
       }
     }
 
