@@ -8,6 +8,7 @@ const partnerPricingTemplateSchema = new mongoose.Schema({
   idleFee: { type: Number, default: 0 },
   sessionFee: { type: Number, default: 0 },
   peakPrice: { type: Number, default: 0 },
+  isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
 module.exports = mongoose.model('PartnerPricingTemplate', partnerPricingTemplateSchema);
