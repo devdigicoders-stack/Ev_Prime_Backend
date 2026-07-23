@@ -431,16 +431,96 @@ const getMyBookings = async (req, res) => {
 // @access  Partner
 const getMyRevenue = async (req, res) => {
   try {
+    const { period = 'All Time' } = req.query;
     const stations = await Station.find({ partner: req.partner.name });
     const stationIds = stations.map(s => s._id);
-    const bookings = await Booking.find({ station: { $in: stationIds }, paymentStatus: 'Paid' });
-    const totalRevenue = bookings.reduce((sum, b) => sum + (b.estimatedCost || 0), 0);
-    const monthlyRevenue = {};
-    bookings.forEach(b => {
-      const month = new Date(b.createdAt).toLocaleString('default', { month: 'short', year: '2-digit' });
-      monthlyRevenue[month] = (monthlyRevenue[month] || 0) + (b.estimatedCost || 0);
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    let currentPeriodFilter = {};
+    let previousPeriodFilter = {};
+    let trendLabel = '-';
+    let prevLabel = 'Previous';
+
+    if (period === 'Today') {
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      currentPeriodFilter = { $gte: today };
+      previousPeriodFilter = { $gte: yesterday, $lt: today };
+      trendLabel = 'vs yesterday';
+      prevLabel = 'Yesterday';
+    } else if (period === 'This Week') {
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+      const startOfLastWeek = new Date(startOfWeek);
+      startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
+      
+      currentPeriodFilter = { $gte: startOfWeek };
+      previousPeriodFilter = { $gte: startOfLastWeek, $lt: startOfWeek };
+      trendLabel = 'vs last week';
+      prevLabel = 'Last Week';
+    } else if (period === 'This Month') {
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      
+      currentPeriodFilter = { $gte: startOfMonth };
+      previousPeriodFilter = { $gte: startOfLastMonth, $lt: startOfMonth };
+      trendLabel = 'vs last month';
+      prevLabel = 'Last Month';
+    }
+
+    const filterCurrent = { station: { $in: stationIds }, paymentStatus: 'Paid' };
+    const filterPrev = { station: { $in: stationIds }, paymentStatus: 'Paid' };
+    
+    if (period !== 'All Time') {
+      filterCurrent.createdAt = currentPeriodFilter;
+      filterPrev.createdAt = previousPeriodFilter;
+    }
+
+    const currentBookings = await Booking.find(filterCurrent);
+    const prevBookings = period === 'All Time' ? [] : await Booking.find(filterPrev);
+
+    let totalRevenue = 0, acRevenue = 0, dcRevenue = 0, idleFees = 0;
+    currentBookings.forEach(b => {
+      const amount = b.estimatedCost || 0;
+      totalRevenue += amount;
+      const type = (b.connectorType || '').toUpperCase();
+      if (type.includes('AC')) acRevenue += amount;
+      else dcRevenue += amount;
+      idleFees += amount * 0.05; // 5% idle fee estimation logic matches frontend
     });
-    res.json({ success: true, data: { totalRevenue, monthlyRevenue, totalBookings: bookings.length } });
+
+    let prevRevenue = 0;
+    prevBookings.forEach(b => prevRevenue += (b.estimatedCost || 0));
+
+    let trendPercentage = 0;
+    let isUp = true;
+    if (period !== 'All Time' && prevRevenue > 0) {
+      trendPercentage = ((totalRevenue - prevRevenue) / prevRevenue) * 100;
+      isUp = trendPercentage >= 0;
+      trendPercentage = Math.abs(trendPercentage);
+    } else if (prevRevenue === 0 && totalRevenue > 0 && period !== 'All Time') {
+      trendPercentage = 100;
+      isUp = true;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        totalRevenue,
+        acRevenue,
+        dcRevenue,
+        idleFees,
+        prevRevenue,
+        trendPercentage: trendPercentage.toFixed(1),
+        isUp,
+        trendLabel,
+        prevLabel,
+        totalBookings: currentBookings.length,
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
