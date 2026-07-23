@@ -44,6 +44,13 @@ const getDashboardData = async (req, res) => {
     const stationsGrowth = calculateGrowth(totalStations, prevStations);
     const partnersGrowth = calculateGrowth(totalPartners, prevPartners);
 
+    // Active & Offline Stations
+    const activeStations = await Station.countDocuments({ status: 'Active' });
+    const offlineStations = totalStations - activeStations;
+
+    // Map Data
+    const mapData = await Station.find({}, 'name location city latitude longitude status connectorTypes.type');
+
     // 2. Booking Stats (Revenue, Sessions, Energy) with Growth
     const bookingStats = await Booking.aggregate([
       {
@@ -79,6 +86,22 @@ const getDashboardData = async (req, res) => {
                 totalEnergy: { $sum: "$estimatedEnergy" },
                 totalSessions: { $sum: 1 }
             }}
+          ],
+          today: [
+            { 
+              $match: { 
+                createdAt: { 
+                  $gte: new Date(new Date().setHours(0,0,0,0)), 
+                  $lt: new Date(new Date().setHours(23,59,59,999)) 
+                } 
+              } 
+            },
+            { $group: {
+                _id: null,
+                todayRevenue: { $sum: "$estimatedCost" },
+                todayEnergy: { $sum: "$estimatedEnergy" },
+                todaySessions: { $sum: 1 }
+            }}
           ]
         }
       }
@@ -87,6 +110,7 @@ const getDashboardData = async (req, res) => {
     const currentBookings = bookingStats[0].currentPeriod[0] || { totalRevenue: 0, totalEnergy: 0, totalSessions: 0 };
     const prevBookings = bookingStats[0].previousPeriod[0] || { totalRevenue: 0, totalEnergy: 0, totalSessions: 0 };
     const allTimeBookings = bookingStats[0].allTime[0] || { totalRevenue: 0, totalEnergy: 0, totalSessions: 0 };
+    const todayBookings = bookingStats[0].today[0] || { todayRevenue: 0, todayEnergy: 0, todaySessions: 0 };
 
     const totalRevenue = allTimeBookings.totalRevenue;
     const totalSessions = allTimeBookings.totalSessions;
@@ -120,6 +144,12 @@ const getDashboardData = async (req, res) => {
       co2Saved, co2Growth,
       totalRevenue, revenueGrowth,
       marketRevenue,
+      activeStations,
+      offlineStations,
+      todaySessions: todayBookings.todaySessions,
+      todayEnergy: Math.floor(todayBookings.todayEnergy),
+      todayRevenue: todayBookings.todayRevenue,
+      mapData
     };
 
     // 3. Revenue Overview Data (Line Chart - Last 14 days)
