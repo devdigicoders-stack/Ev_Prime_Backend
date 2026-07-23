@@ -14,6 +14,10 @@ const partnerSchema = new mongoose.Schema({
   hasCredentials: { type: Boolean, default: false },
   fcmToken: { type: String, trim: true },
   
+  // Password Reset
+  resetPasswordOtp: { type: String },
+  resetPasswordExpires: { type: Date },
+  
   // Business Information
   gstNumber: { type: String, trim: true },
   panNumber: { type: String, trim: true },

@@ -271,6 +271,98 @@ const partnerLogin = async (req, res) => {
   }
 };
 
+// @desc    Partner forgot password (send OTP)
+// @route   POST /api/partner/forgot-password
+// @access  Public
+const forgotPassword = async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ message: 'Phone number is required' });
+
+    const partner = await Partner.findOne({ phone });
+    if (!partner || !partner.hasCredentials) {
+      return res.status(404).json({ message: 'No active partner found with this phone number' });
+    }
+
+    // Generate fixed OTP for now as requested
+    const otp = '1234';
+    
+    // Set expiry to 10 minutes
+    const expires = new Date();
+    expires.setMinutes(expires.getMinutes() + 10);
+
+    partner.resetPasswordOtp = otp;
+    partner.resetPasswordExpires = expires;
+    await partner.save();
+
+    res.json({ success: true, message: 'OTP sent successfully to your registered mobile number.' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Partner verify OTP
+// @route   POST /api/partner/verify-otp
+// @access  Public
+const verifyOtp = async (req, res) => {
+  try {
+    const { phone, otp } = req.body;
+    if (!phone || !otp) return res.status(400).json({ message: 'Phone and OTP are required' });
+
+    const partner = await Partner.findOne({ phone });
+    if (!partner) return res.status(404).json({ message: 'Partner not found' });
+
+    if (partner.resetPasswordOtp !== otp) {
+      return res.status(400).json({ message: 'Invalid OTP' });
+    }
+
+    if (partner.resetPasswordExpires < new Date()) {
+      return res.status(400).json({ message: 'OTP has expired' });
+    }
+
+    // Success, we can return a temporary token so they can reset their password
+    const resetToken = jwt.sign({ id: partner._id, type: 'partner_reset' }, process.env.JWT_SECRET, { expiresIn: '15m' });
+
+    res.json({ success: true, message: 'OTP verified successfully', resetToken });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Partner reset password
+// @route   POST /api/partner/reset-password
+// @access  Public
+const resetPassword = async (req, res) => {
+  try {
+    const { resetToken, newPassword } = req.body;
+    if (!resetToken || !newPassword) return res.status(400).json({ message: 'Token and new password are required' });
+    if (newPassword.length < 6) return res.status(400).json({ message: 'Password must be at least 6 characters' });
+
+    let decoded;
+    try {
+      decoded = jwt.verify(resetToken, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(400).json({ message: 'Invalid or expired reset token' });
+    }
+
+    if (decoded.type !== 'partner_reset') {
+      return res.status(400).json({ message: 'Invalid token type' });
+    }
+
+    const partner = await Partner.findById(decoded.id);
+    if (!partner) return res.status(404).json({ message: 'Partner not found' });
+
+    partner.appPassword = newPassword; // Will be hashed by pre-save hook
+    partner.resetPasswordOtp = undefined;
+    partner.resetPasswordExpires = undefined;
+    await partner.save();
+
+    res.json({ success: true, message: 'Password reset successfully. You can now login.' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Partner: Get own profile
 // @route   GET /api/partner/me
 // @access  Partner
@@ -881,6 +973,9 @@ const markNotificationsRead = async (req, res) => {
 };
 
 module.exports = {
+  forgotPassword,
+  verifyOtp,
+  resetPassword,
   registerPartner,
   createPartner,
   getAllPartners,

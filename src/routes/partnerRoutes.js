@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const {
+  forgotPassword,
+  verifyOtp,
+  resetPassword,
   registerPartner,
   createPartner,
   getAllPartners,
@@ -37,6 +40,9 @@ const upload = require('../middlewares/uploadMiddleware');
 // Public
 router.post('/register', registerPartner);
 router.post('/login', partnerLogin);
+router.post('/forgot-password', forgotPassword);
+router.post('/verify-otp', verifyOtp);
+router.post('/reset-password', resetPassword);
 
 // Partner self-service (partner app)
 router.get('/me', protectPartner, getMyProfile);
