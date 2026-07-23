@@ -1217,6 +1217,75 @@ const getMyReviews = async (req, res) => {
   }
 };
 
+// @desc    Get detailed reports (transactions) for export
+// @route   GET /api/partner/me/reports
+// @access  Partner
+const getMyReports = async (req, res) => {
+  try {
+    const period = req.query.period || 'All Time';
+    const stations = await Station.find({ partner: req.partner.name });
+    const stationIds = stations.map(s => s._id);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let currentPeriodFilter = null;
+    
+    if (period === 'Today') {
+      currentPeriodFilter = { $gte: today };
+    } else if (period === 'This Week') {
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+      currentPeriodFilter = { $gte: startOfWeek };
+    } else if (period === 'This Month') {
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      currentPeriodFilter = { $gte: startOfMonth };
+    }
+
+    const filter = { station: { $in: stationIds }, paymentStatus: 'Paid' };
+    if (period !== 'All Time' && currentPeriodFilter) {
+      filter.createdAt = currentPeriodFilter;
+    }
+
+    const bookings = await Booking.find(filter)
+      .populate('user', 'name')
+      .populate('station', 'name')
+      .sort({ createdAt: -1 });
+
+    let totalRevenue = 0;
+    let totalEnergy = 0;
+
+    const reportData = bookings.map(b => {
+      totalRevenue += (b.estimatedCost || 0);
+      totalEnergy += (b.powerConsumed || 0);
+
+      return {
+        bookingId: b.bookingId,
+        date: b.createdAt,
+        stationName: b.station ? b.station.name : 'Unknown',
+        customerName: b.user ? b.user.name : 'Unknown',
+        connectorType: b.connectorType,
+        powerConsumed: b.powerConsumed || 0,
+        amount: b.estimatedCost || 0,
+        status: b.status
+      };
+    });
+
+    res.json({
+      success: true,
+      summary: {
+        totalRevenue,
+        totalBookings: reportData.length,
+        totalEnergy,
+        period
+      },
+      data: reportData
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   forgotPassword,
   verifyOtp,
@@ -1260,5 +1329,6 @@ module.exports = {
   createComplaint,
   getComplaintDetails,
   replyToComplaint,
-  getMyReviews
+  getMyReviews,
+  getMyReports
 };

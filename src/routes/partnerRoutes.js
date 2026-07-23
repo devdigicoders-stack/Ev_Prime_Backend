@@ -38,7 +38,8 @@ const {
   createComplaint,
   getComplaintDetails,
   replyToComplaint,
-  getMyReviews
+  getMyReviews,
+  getMyReports
 } = require('../controllers/partnerController');
 const { protect, protectPartner } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
@@ -112,5 +113,8 @@ router.post('/me/complaints/:id/reply', protectPartner, replyToComplaint);
 
 // Reviews
 router.get('/me/reviews', protectPartner, getMyReviews);
+
+// Reports
+router.get('/me/reports', protectPartner, getMyReports);
 
 module.exports = router;
