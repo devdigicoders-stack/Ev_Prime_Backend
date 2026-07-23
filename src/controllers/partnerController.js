@@ -191,6 +191,51 @@ const getPartnerHistory = async (req, res) => {
   }
 };
 
+// @desc    Partner app registration
+// @route   POST /api/partner/register
+// @access  Public
+const registerPartner = async (req, res) => {
+  try {
+    const { name, contactPerson, email, phone, appUsername, appPassword, businessType, businessAddress, gstNumber, panNumber } = req.body;
+    
+    if (!name || !contactPerson || !email || !phone || !appUsername || !appPassword) {
+      return res.status(400).json({ message: 'Please provide all required fields' });
+    }
+
+    const partnerExists = await Partner.findOne({ email });
+    if (partnerExists) return res.status(400).json({ message: 'Partner with this email already exists' });
+
+    const existingUser = await Partner.findOne({ appUsername });
+    if (existingUser) return res.status(400).json({ message: 'Username already taken' });
+
+    const partner = await Partner.create({
+      name,
+      contactPerson,
+      email,
+      phone,
+      appUsername,
+      appPassword,
+      businessType,
+      businessAddress,
+      gstNumber,
+      panNumber,
+      hasCredentials: true,
+      status: 'Pending',
+    });
+
+    await createAuditLog({
+      user: partner.name,
+      role: 'Partner',
+      action: 'Registered', module: 'Partner Management',
+      details: `Partner ${name} registered via App and is pending approval.`, ip: req.ip
+    });
+
+    res.status(201).json({ success: true, message: 'Registration successful. Waiting for admin approval.' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Partner app login
 // @route   POST /api/partner/login
 // @access  Public
@@ -201,6 +246,9 @@ const partnerLogin = async (req, res) => {
 
     const partner = await Partner.findOne({ appUsername: username });
     if (!partner || !partner.hasCredentials) return res.status(401).json({ message: 'Invalid credentials' });
+    
+    if (partner.status === 'Pending') return res.status(403).json({ message: 'Your account is pending admin approval.' });
+    if (partner.status === 'Rejected') return res.status(403).json({ message: 'Your account application was rejected.' });
     if (partner.status === 'Blocked') return res.status(403).json({ message: 'Your account has been blocked. Contact admin.' });
 
     const isMatch = await partner.matchPassword(password);
@@ -833,6 +881,7 @@ const markNotificationsRead = async (req, res) => {
 };
 
 module.exports = {
+  registerPartner,
   createPartner,
   getAllPartners,
   updatePartner,

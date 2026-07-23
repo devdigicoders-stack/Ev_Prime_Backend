@@ -6,7 +6,7 @@ const partnerSchema = new mongoose.Schema({
   contactPerson: { type: String, required: true, trim: true },
   email: { type: String, required: true, unique: true, trim: true, lowercase: true },
   phone: { type: String, required: true, trim: true },
-  status: { type: String, enum: ['Active', 'Blocked'], default: 'Active' },
+  status: { type: String, enum: ['Pending', 'Active', 'Rejected', 'Blocked'], default: 'Pending' },
   stationsCount: { type: Number, default: 0 },
   // App login credentials
   appUsername: { type: String, trim: true, sparse: true },

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const {
+  registerPartner,
   createPartner,
   getAllPartners,
   updatePartner,
@@ -34,6 +35,7 @@ const { protect, protectPartner } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
 
 // Public
+router.post('/register', registerPartner);
 router.post('/login', partnerLogin);
 
 // Partner self-service (partner app)
