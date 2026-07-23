@@ -39,9 +39,13 @@ const bookingSchema = new mongoose.Schema({
   razorpaySignature: { type: String },
   status: {
     type: String,
-    enum: ['Confirmed', 'Completed', 'Cancelled', 'No Show'],
+    enum: ['Confirmed', 'Ongoing', 'Charging', 'Completed', 'Cancelled', 'No Show'],
     default: 'Confirmed',
   },
+  chargingStartTime: { type: Date },
+  chargingEndTime: { type: Date },
+  unitsConsumed: { type: Number },
+  duration: { type: Number },
   cancellationReason: { type: String },
   refundAmount: { type: Number },
   refundStatus: {
