@@ -27,13 +27,15 @@ const createOrder = async (req, res) => {
     const { amount } = req.body;
     if (!amount || amount <= 0) return res.status(400).json({ success: false, message: 'Invalid amount' });
 
+    // Flutter sends amount already in paise (rupees * 100), use directly
     const order = await getRazorpay().orders.create({
-      amount: Math.round(amount * 100), // paise
+      amount: Math.round(amount), // already in paise
       currency: 'INR',
       receipt: `rcpt_${Date.now()}`,
     });
 
-    res.json({ success: true, data: { orderId: order.id, amount: order.amount, currency: order.currency } });
+    // Return orderId at root level for easy Flutter parsing
+    res.json({ success: true, orderId: order.id, amount: order.amount, currency: order.currency });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
