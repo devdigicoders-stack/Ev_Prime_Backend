@@ -5,7 +5,6 @@ const AdminNotification = require('../models/AdminNotification');
 const AdminBroadcast = require('../models/AdminBroadcast');
 const PartnerPayout = require('../models/PartnerPayout');
 const PartnerComplaint = require('../models/PartnerComplaint');
-const PartnerRequest = require('../models/PartnerRequest');
 const notificationService = require('../services/notificationService');
 const mongoose = require('mongoose');
 
@@ -431,86 +430,6 @@ const replyToPartnerComplaint = async (req, res) => {
   }
 };
 
-// @desc    Admin: Get all partner requests
-// @route   GET /api/admin/partner-requests
-// @access  Admin
-const getAllPartnerRequests = async (req, res) => {
-  try {
-    const requests = await PartnerRequest.find({})
-      .populate('partner', 'name email phone')
-      .populate('station', 'name')
-      .sort({ createdAt: -1 });
-    res.json({ success: true, data: requests });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @desc    Admin: Update partner request status
-// @route   PUT /api/admin/partner-requests/:id/status
-// @access  Admin
-const updatePartnerRequestStatus = async (req, res) => {
-  try {
-    const { status } = req.body;
-    const request = await PartnerRequest.findById(req.params.id);
-    if (!request) return res.status(404).json({ message: 'Request not found' });
-
-    request.status = status;
-    await request.save();
-
-    // Send Notification to Partner
-    await notificationService.sendToPartner(
-      request.partner,
-      'Request Status Updated',
-      `Your request #${request.requestId} status has been updated to ${status}.`,
-      { type: 'request_update', requestId: request._id.toString() },
-      'alert'
-    );
-
-    res.json({ success: true, data: request });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @desc    Admin: Reply to partner request
-// @route   POST /api/admin/partner-requests/:id/reply
-// @access  Admin
-const replyToPartnerRequest = async (req, res) => {
-  try {
-    const { text } = req.body;
-    if (!text) return res.status(400).json({ message: 'Message text is required' });
-
-    const request = await PartnerRequest.findById(req.params.id);
-    if (!request) return res.status(404).json({ message: 'Request not found' });
-
-    request.messages.push({
-      sender: 'Admin',
-      senderName: req.admin.name || 'Admin',
-      text
-    });
-
-    if (request.status === 'Closed') {
-      request.status = 'In Progress';
-    }
-
-    await request.save();
-
-    // Send Notification to Partner
-    await notificationService.sendToPartner(
-      request.partner,
-      'New Reply from Admin',
-      `Admin replied to your request #${request.requestId}.`,
-      { type: 'request_reply', requestId: request._id.toString() },
-      'alert'
-    );
-
-    res.json({ success: true, data: request });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
 module.exports = {
   registerAdmin,
   loginAdmin,
@@ -527,11 +446,7 @@ module.exports = {
   resendBroadcast,
   getAllPayouts,
   updatePayoutStatus,
-  updatePayoutStatus,
   getAllPartnerComplaints,
   updatePartnerComplaintStatus,
-  replyToPartnerComplaint,
-  getAllPartnerRequests,
-  updatePartnerRequestStatus,
-  replyToPartnerRequest
+  replyToPartnerComplaint
 };
