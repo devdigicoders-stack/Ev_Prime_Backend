@@ -1230,22 +1230,29 @@ const getMyReviews = async (req, res) => {
 const getMyReports = async (req, res) => {
   try {
     const period = req.query.period || 'This Month';
-    // Match stations by partner name or partner ID
+    
+    // Find stations linked to this partner
     const stations = await Station.find({
       $or: [
         { partner: req.partner.name },
         { partnerId: req.partner._id },
-        { partner: req.partner._id.toString() }
+        { partner: req.partner._id.toString() },
+        { partner: req.partner.companyName }
       ]
     });
     const stationIds = stations.map(s => s._id);
+
+    let query = {};
+    if (stationIds.length > 0) {
+      query.station = { $in: stationIds };
+    }
 
     const now = new Date();
     let dateFilter = null;
 
     if (period === 'Today' || period === 'daily' || period === '1d') {
-      const startOfDay = new Date(now.setHours(0, 0, 0, 0));
-      const endOfDay = new Date(now.setHours(23, 59, 59, 999));
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
       dateFilter = { $gte: startOfDay, $lte: endOfDay };
     } else if (period === 'This Week' || period === 'weekly' || period === '7d') {
       const pastWeek = new Date();
@@ -1257,7 +1264,6 @@ const getMyReports = async (req, res) => {
       dateFilter = { $gte: pastMonth };
     }
 
-    const query = { station: { $in: stationIds } };
     if (dateFilter) {
       query.createdAt = dateFilter;
     }
@@ -1274,15 +1280,14 @@ const getMyReports = async (req, res) => {
     const stationMap = {};
 
     const reportData = bookings.map(b => {
-      const amount = b.estimatedCost || 0;
-      const energy = b.unitsConsumed || b.estimatedEnergy || b.powerConsumed || 0;
-      const carbon = b.carbonSavedKg || 0;
+      const amount = Number(b.estimatedCost || b.totalAmount || b.amount || 0);
+      const energy = Number(b.unitsConsumed || b.estimatedEnergy || b.powerConsumed || 0);
+      const carbon = Number(b.carbonSavedKg || 0);
 
-      if (b.status === 'Completed' || b.status === 'Confirmed' || b.status === 'Ongoing') {
-        totalRevenue += amount;
-        totalEnergy += energy;
-        carbonSaved += carbon;
-      }
+      // Sum all revenue & energy for report summary
+      totalRevenue += amount;
+      totalEnergy += energy;
+      carbonSaved += carbon;
 
       const stId = b.station?._id ? b.station._id.toString() : 'unknown';
       const stName = b.station?.name || 'Unknown Station';
@@ -1320,7 +1325,7 @@ const getMyReports = async (req, res) => {
     res.json({
       success: true,
       summary: {
-        totalRevenue,
+        totalRevenue: Math.round(totalRevenue * 100) / 100,
         totalBookings: reportData.length,
         totalEnergy: Math.round(totalEnergy * 100) / 100,
         carbonSaved: Math.round(carbonSaved * 100) / 100,
