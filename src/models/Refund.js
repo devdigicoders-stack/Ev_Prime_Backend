@@ -14,8 +14,7 @@ const refundSchema = new mongoose.Schema({
   },
   booking: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Booking',
-    required: true
+    ref: 'Booking'
   },
   amount: {
     type: Number,

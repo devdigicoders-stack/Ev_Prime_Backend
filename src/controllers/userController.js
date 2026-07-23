@@ -102,6 +102,10 @@ const loginUser = async (req, res) => {
       return res.status(404).json({ message: 'User not found. Please register first.' });
     }
 
+    if (user.status === 'blocked') {
+      return res.status(403).json({ message: 'Account is blocked. Please contact support.' });
+    }
+
     res.json({
       _id: user._id,
       name: user.name,
@@ -238,6 +242,7 @@ const changePassword = async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
+
 // Delete own account
 const deleteOwnAccount = async (req, res) => {
   try {
@@ -246,5 +251,242 @@ const deleteOwnAccount = async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
-Object.assign(module.exports, { changePassword, deleteOwnAccount });
+// ─── ADMIN ACTIONS ─────────────────────────────────────────────────────────
+
+// @desc    Block a user
+// @route   PUT /api/user/:id/block
+// @access  Admin
+const blockUser = async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(req.params.id, { status: 'blocked' }, { new: true });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    res.json({ success: true, message: 'User blocked successfully', user });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+};
+
+// @desc    Unblock a user
+// @route   PUT /api/user/:id/unblock
+// @access  Admin
+const unblockUser = async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(req.params.id, { status: 'active' }, { new: true });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    res.json({ success: true, message: 'User unblocked successfully', user });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+};
+
+// @desc    Get user charging history
+// @route   GET /api/user/:id/charging-history
+// @access  Admin
+const getUserChargingHistory = async (req, res) => {
+  try {
+    const Booking = require('../models/Booking');
+    const bookings = await Booking.find({ user: req.params.id })
+      .populate('station', 'name city location')
+      .sort({ createdAt: -1 })
+      .limit(50);
+    res.json({ success: true, data: bookings });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+};
+
+// @desc    Get user wallet details
+// @route   GET /api/user/:id/wallet
+// @access  Admin
+const getUserWallet = async (req, res) => {
+  try {
+    const Refund = require('../models/Refund');
+    let wallet = await Wallet.findOne({ user: req.params.id });
+    if (!wallet) {
+      wallet = await Wallet.create({ user: req.params.id, balance: 0 });
+    }
+    const transactions = await Transaction.find({ user: req.params.id })
+      .sort({ createdAt: -1 })
+      .limit(50);
+    const refunds = await Refund.find({ user: req.params.id })
+      .sort({ createdAt: -1 })
+      .limit(50);
+    res.json({ success: true, data: { wallet, transactions, refunds } });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+};
+
+// @desc    Admin initiate wallet refund to user
+// @route   POST /api/user/:id/wallet/refund or POST /api/user/:id/refund
+// @access  Admin
+const adminWalletRefund = async (req, res) => {
+  try {
+    const Refund = require('../models/Refund');
+    const { amount, reason } = req.body;
+    if (!amount || amount <= 0) return res.status(400).json({ success: false, message: 'Valid amount required' });
+    
+    let wallet = await Wallet.findOne({ user: req.params.id });
+    if (!wallet) {
+      wallet = await Wallet.create({ user: req.params.id, balance: 0 });
+    }
+    
+    wallet.balance += parseFloat(amount);
+    await wallet.save();
+
+    const refId = `REF_${Date.now()}`;
+
+    const transaction = await Transaction.create({
+      user: req.params.id,
+      wallet: wallet._id,
+      amount: parseFloat(amount),
+      type: 'CREDIT',
+      description: reason ? `Admin Refund: ${reason}` : 'Admin initiated refund',
+      status: 'SUCCESS',
+      referenceId: refId
+    });
+
+    const refund = await Refund.create({
+      refundId: refId,
+      user: req.params.id,
+      amount: parseFloat(amount),
+      paymentMethod: 'wallet',
+      reason: reason || 'Admin initiated refund',
+      status: 'Approved',
+      refundDestination: 'wallet'
+    });
+
+    res.json({ success: true, message: `₹${amount} refunded & credited to wallet`, balance: wallet.balance, refund, transaction });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+};
+
+// @desc    Get user refunds
+// @route   GET /api/user/:id/refunds
+// @access  Admin
+const getUserRefunds = async (req, res) => {
+  try {
+    const Refund = require('../models/Refund');
+    const refunds = await Refund.find({ user: req.params.id }).sort({ createdAt: -1 });
+    res.json({ success: true, data: refunds });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+};
+
+// @desc    Get user KYC details
+// @route   GET /api/user/:id/kyc
+// @access  Admin
+const getUserKYC = async (req, res) => {
+  try {
+    const KYC = require('../models/KYC');
+    const kyc = await KYC.findOne({ user: req.params.id });
+    res.json({ success: true, data: kyc });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+};
+
+// @desc    Update user KYC status (verify/reject)
+// @route   PUT /api/user/:id/kyc/status
+// @access  Admin
+const updateKYCStatus = async (req, res) => {
+  try {
+    const KYC = require('../models/KYC');
+    const { status, rejectionReason } = req.body;
+    const updateData = { status };
+    if (status === 'verified') updateData.verifiedAt = new Date();
+    if (status === 'rejected') updateData.rejectionReason = rejectionReason || 'Documents rejected by admin';
+    
+    let kyc = await KYC.findOneAndUpdate(
+      { user: req.params.id },
+      updateData,
+      { new: true, upsert: true }
+    );
+    res.json({ success: true, message: `KYC ${status} successfully`, data: kyc });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+};
+
+// @desc    Submit user KYC (User App API)
+// @route   POST /api/user/kyc/submit
+// @access  Private (User)
+const submitOwnKYC = async (req, res) => {
+  try {
+    const KYC = require('../models/KYC');
+    const { aadhaarNumber, panNumber, aadhaarFront, aadhaarBack, panImage, selfie } = req.body;
+    
+    let updateData = {
+      user: req.user._id,
+      aadhaarNumber,
+      panNumber,
+      status: 'pending',
+      rejectionReason: ''
+    };
+
+    if (req.files) {
+      if (req.files.aadhaarFront) updateData.aadhaarFront = `/uploads/${req.files.aadhaarFront[0].filename}`;
+      if (req.files.aadhaarBack) updateData.aadhaarBack = `/uploads/${req.files.aadhaarBack[0].filename}`;
+      if (req.files.panImage) updateData.panImage = `/uploads/${req.files.panImage[0].filename}`;
+      if (req.files.selfie) updateData.selfie = `/uploads/${req.files.selfie[0].filename}`;
+    }
+
+    if (aadhaarFront) updateData.aadhaarFront = aadhaarFront;
+    if (aadhaarBack) updateData.aadhaarBack = aadhaarBack;
+    if (panImage) updateData.panImage = panImage;
+    if (selfie) updateData.selfie = selfie;
+
+    const kyc = await KYC.findOneAndUpdate(
+      { user: req.user._id },
+      updateData,
+      { new: true, upsert: true }
+    );
+
+    res.json({ success: true, message: 'KYC submitted successfully. Pending admin review.', data: kyc });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+};
+
+// @desc    Get user's own KYC status (User App)
+// @route   GET /api/user/kyc/me
+// @access  Private (User)
+const getOwnKYC = async (req, res) => {
+  try {
+    const KYC = require('../models/KYC');
+    const kyc = await KYC.findOne({ user: req.user._id });
+    res.json({ success: true, data: kyc });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+};
+
+// @desc    Admin upload/edit user KYC documents directly
+// @route   POST /api/user/:id/kyc
+// @access  Admin
+const adminSaveUserKYC = async (req, res) => {
+  try {
+    const KYC = require('../models/KYC');
+    const { aadhaarNumber, panNumber, aadhaarFront, aadhaarBack, panImage, selfie, status } = req.body;
+    
+    let updateData = {
+      user: req.params.id,
+      aadhaarNumber,
+      panNumber,
+      status: status || 'pending'
+    };
+
+    if (req.files) {
+      if (req.files.aadhaarFront) updateData.aadhaarFront = `/uploads/${req.files.aadhaarFront[0].filename}`;
+      if (req.files.aadhaarBack) updateData.aadhaarBack = `/uploads/${req.files.aadhaarBack[0].filename}`;
+      if (req.files.panImage) updateData.panImage = `/uploads/${req.files.panImage[0].filename}`;
+      if (req.files.selfie) updateData.selfie = `/uploads/${req.files.selfie[0].filename}`;
+    }
+
+    if (aadhaarFront) updateData.aadhaarFront = aadhaarFront;
+    if (aadhaarBack) updateData.aadhaarBack = aadhaarBack;
+    if (panImage) updateData.panImage = panImage;
+    if (selfie) updateData.selfie = selfie;
+
+    const kyc = await KYC.findOneAndUpdate(
+      { user: req.params.id },
+      updateData,
+      { new: true, upsert: true }
+    );
+
+    res.json({ success: true, message: 'KYC updated successfully by admin', data: kyc });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+};
+
+Object.assign(module.exports, { 
+  changePassword, deleteOwnAccount,
+  blockUser, unblockUser,
+  getUserChargingHistory,
+  getUserWallet, adminWalletRefund, getUserRefunds,
+  getUserKYC, updateKYCStatus,
+  submitOwnKYC, getOwnKYC, adminSaveUserKYC
+});
+
 
