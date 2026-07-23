@@ -55,8 +55,7 @@ const getDashboardData = async (req, res) => {
     const bookingStats = await Booking.aggregate([
       {
         $match: {
-          status: { $in: ['Completed', 'Confirmed'] },
-          paymentStatus: 'Paid'
+          status: { $in: ['Completed', 'Confirmed', 'Ongoing'] }
         }
       },
       {
@@ -66,7 +65,7 @@ const getDashboardData = async (req, res) => {
             { $group: {
                 _id: null,
                 totalRevenue: { $sum: "$estimatedCost" },
-                totalEnergy: { $sum: "$estimatedEnergy" },
+                totalEnergy: { $sum: { $ifNull: ["$unitsConsumed", "$estimatedEnergy"] } },
                 totalSessions: { $sum: 1 }
             }}
           ],
@@ -75,7 +74,7 @@ const getDashboardData = async (req, res) => {
             { $group: {
                 _id: null,
                 totalRevenue: { $sum: "$estimatedCost" },
-                totalEnergy: { $sum: "$estimatedEnergy" },
+                totalEnergy: { $sum: { $ifNull: ["$unitsConsumed", "$estimatedEnergy"] } },
                 totalSessions: { $sum: 1 }
             }}
           ],
@@ -83,7 +82,7 @@ const getDashboardData = async (req, res) => {
              { $group: {
                 _id: null,
                 totalRevenue: { $sum: "$estimatedCost" },
-                totalEnergy: { $sum: "$estimatedEnergy" },
+                totalEnergy: { $sum: { $ifNull: ["$unitsConsumed", "$estimatedEnergy"] } },
                 totalSessions: { $sum: 1 }
             }}
           ],
@@ -99,7 +98,7 @@ const getDashboardData = async (req, res) => {
             { $group: {
                 _id: null,
                 todayRevenue: { $sum: "$estimatedCost" },
-                todayEnergy: { $sum: "$estimatedEnergy" },
+                todayEnergy: { $sum: { $ifNull: ["$unitsConsumed", "$estimatedEnergy"] } },
                 todaySessions: { $sum: 1 }
             }}
           ]
@@ -130,7 +129,7 @@ const getDashboardData = async (req, res) => {
 
     // Market Revenue
     const marketRevenueAgg = await MarketOrder.aggregate([
-      { $match: { paymentStatus: 'Paid', status: { $ne: 'Cancelled' } } },
+      { $match: { status: { $ne: 'Cancelled' } } },
       { $group: { _id: null, total: { $sum: '$totalAmount' } } }
     ]);
     const marketRevenue = marketRevenueAgg[0]?.total || 0;
@@ -160,8 +159,7 @@ const getDashboardData = async (req, res) => {
     const dailyRevenue = await Booking.aggregate([
       { 
         $match: { 
-          status: { $in: ['Completed', 'Confirmed'] },
-          paymentStatus: 'Paid',
+          status: { $in: ['Completed', 'Confirmed', 'Ongoing'] },
           createdAt: { $gte: fourteenDaysAgo }
         } 
       },

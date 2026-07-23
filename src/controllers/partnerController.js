@@ -434,8 +434,20 @@ const getMyBookings = async (req, res) => {
 const getMyRevenue = async (req, res) => {
   try {
     const { period = 'All Time' } = req.query;
-    const stations = await Station.find({ partner: req.partner.name });
+    const stations = await Station.find({
+      $or: [
+        { partner: req.partner.name },
+        { partnerId: req.partner._id },
+        { partner: req.partner._id.toString() },
+        { partner: req.partner.companyName }
+      ]
+    });
     const stationIds = stations.map(s => s._id);
+
+    let stationFilter = {};
+    if (stationIds.length > 0) {
+      stationFilter = { station: { $in: stationIds } };
+    }
 
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -473,8 +485,8 @@ const getMyRevenue = async (req, res) => {
       prevLabel = 'Last Month';
     }
 
-    const filterCurrent = { station: { $in: stationIds }, paymentStatus: 'Paid' };
-    const filterPrev = { station: { $in: stationIds }, paymentStatus: 'Paid' };
+    const filterCurrent = { ...stationFilter };
+    const filterPrev = { ...stationFilter };
     
     if (period !== 'All Time') {
       filterCurrent.createdAt = currentPeriodFilter;
@@ -486,16 +498,16 @@ const getMyRevenue = async (req, res) => {
 
     let totalRevenue = 0, acRevenue = 0, dcRevenue = 0, idleFees = 0;
     currentBookings.forEach(b => {
-      const amount = b.estimatedCost || 0;
+      const amount = Number(b.estimatedCost || b.totalAmount || b.amount || 0);
       totalRevenue += amount;
       const type = (b.connectorType || '').toUpperCase();
       if (type.includes('AC')) acRevenue += amount;
       else dcRevenue += amount;
-      idleFees += amount * 0.05; // 5% idle fee estimation logic matches frontend
+      idleFees += amount * 0.05;
     });
 
     let prevRevenue = 0;
-    prevBookings.forEach(b => prevRevenue += (b.estimatedCost || 0));
+    prevBookings.forEach(b => prevRevenue += Number(b.estimatedCost || b.totalAmount || b.amount || 0));
 
     let trendPercentage = 0;
     let isUp = true;
@@ -508,19 +520,43 @@ const getMyRevenue = async (req, res) => {
       isUp = true;
     }
 
+    // 7-day Revenue Graph Trend
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const revenueGraph = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const nextD = new Date(d);
+      nextD.setDate(nextD.getDate() + 1);
+
+      const dayBookings = currentBookings.filter(b => {
+        const bDate = new Date(b.createdAt);
+        return bDate >= d && bDate < nextD;
+      });
+      const dayRev = dayBookings.reduce((sum, b) => sum + Number(b.estimatedCost || b.totalAmount || b.amount || 0), 0);
+
+      revenueGraph.push({
+        day: dayNames[d.getDay()],
+        date: `${d.getDate()} ${d.toLocaleString('default', { month: 'short' })}`,
+        revenue: Math.round(dayRev * 100) / 100,
+        bookings: dayBookings.length
+      });
+    }
+
     res.json({
       success: true,
       data: {
-        totalRevenue,
-        acRevenue,
-        dcRevenue,
-        idleFees,
-        prevRevenue,
+        totalRevenue: Math.round(totalRevenue * 100) / 100,
+        acRevenue: Math.round(acRevenue * 100) / 100,
+        dcRevenue: Math.round(dcRevenue * 100) / 100,
+        idleFees: Math.round(idleFees * 100) / 100,
+        prevRevenue: Math.round(prevRevenue * 100) / 100,
         trendPercentage: trendPercentage.toFixed(1),
         isUp,
         trendLabel,
         prevLabel,
         totalBookings: currentBookings.length,
+        revenueGraph
       }
     });
   } catch (error) {
@@ -533,23 +569,57 @@ const getMyRevenue = async (req, res) => {
 // @access  Partner
 const getMyDashboard = async (req, res) => {
   try {
-    const stations = await Station.find({ partner: req.partner.name });
+    const stations = await Station.find({
+      $or: [
+        { partner: req.partner.name },
+        { partnerId: req.partner._id },
+        { partner: req.partner._id.toString() },
+        { partner: req.partner.companyName }
+      ]
+    });
     const stationIds = stations.map(s => s._id);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const allBookings = await Booking.find({ station: { $in: stationIds } });
+
+    let stationFilter = {};
+    if (stationIds.length > 0) {
+      stationFilter = { station: { $in: stationIds } };
+    }
+
+    const allBookings = await Booking.find(stationFilter);
     const todayBookings = allBookings.filter(b => new Date(b.createdAt) >= today);
-    const paidBookings = allBookings.filter(b => b.paymentStatus === 'Paid');
-    const todayRevenue = todayBookings.filter(b => b.paymentStatus === 'Paid').reduce((sum, b) => sum + (b.estimatedCost || 0), 0);
-    const totalRevenue = paidBookings.reduce((sum, b) => sum + (b.estimatedCost || 0), 0);
+    const todayRevenue = todayBookings.reduce((sum, b) => sum + Number(b.estimatedCost || b.totalAmount || b.amount || 0), 0);
+    const totalRevenue = allBookings.reduce((sum, b) => sum + Number(b.estimatedCost || b.totalAmount || b.amount || 0), 0);
     const activeStations = stations.filter(s => s.status === 'Active').length;
-    const activeSessions = allBookings.filter(b => b.status === 'Confirmed').length;
-    const recentBookings = await Booking.find({ station: { $in: stationIds } })
+    const activeSessions = allBookings.filter(b => b.status === 'Confirmed' || b.status === 'Ongoing').length;
+    const recentBookings = await Booking.find(stationFilter)
       .populate('user', 'name')
       .populate('station', 'name')
       .sort({ createdAt: -1 })
       .limit(5);
     const unreadNotificationsCount = await PartnerNotification.countDocuments({ partner: req.partner._id, isRead: false });
+
+    // 7-Day Revenue Graph points
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const revenueGraph = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const nextD = new Date(d);
+      nextD.setDate(nextD.getDate() + 1);
+
+      const dayBookings = allBookings.filter(b => {
+        const bDate = new Date(b.createdAt);
+        return bDate >= d && bDate < nextD;
+      });
+      const dayRev = dayBookings.reduce((sum, b) => sum + Number(b.estimatedCost || b.totalAmount || b.amount || 0), 0);
+
+      revenueGraph.push({
+        day: dayNames[d.getDay()],
+        revenue: Math.round(dayRev * 100) / 100,
+        bookings: dayBookings.length
+      });
+    }
 
     res.json({
       success: true,
@@ -559,10 +629,11 @@ const getMyDashboard = async (req, res) => {
         activeSessions,
         totalBookings: allBookings.length,
         todayBookings: todayBookings.length,
-        totalRevenue,
-        todayRevenue,
+        totalRevenue: Math.round(totalRevenue * 100) / 100,
+        todayRevenue: Math.round(todayRevenue * 100) / 100,
         recentBookings,
         unreadNotificationsCount,
+        revenueGraph
       }
     });
   } catch (error) {
