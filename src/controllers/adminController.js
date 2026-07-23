@@ -4,6 +4,7 @@ const User = require('../models/User');
 const AdminNotification = require('../models/AdminNotification');
 const AdminBroadcast = require('../models/AdminBroadcast');
 const PartnerPayout = require('../models/PartnerPayout');
+const PartnerComplaint = require('../models/PartnerComplaint');
 const notificationService = require('../services/notificationService');
 const mongoose = require('mongoose');
 
@@ -349,6 +350,66 @@ const updatePayoutStatus = async (req, res) => {
   }
 };
 
+// @desc    Admin: Get all partner complaints
+// @route   GET /api/admin/partner-complaints
+// @access  Admin
+const getAllPartnerComplaints = async (req, res) => {
+  try {
+    const complaints = await PartnerComplaint.find({})
+      .populate('partner', 'name email phone')
+      .populate('station', 'name')
+      .sort({ createdAt: -1 });
+    res.json({ success: true, data: complaints });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Admin: Update partner complaint status
+// @route   PUT /api/admin/partner-complaints/:id/status
+// @access  Admin
+const updatePartnerComplaintStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const complaint = await PartnerComplaint.findById(req.params.id);
+    if (!complaint) return res.status(404).json({ message: 'Complaint not found' });
+
+    complaint.status = status;
+    await complaint.save();
+    res.json({ success: true, data: complaint });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Admin: Reply to partner complaint
+// @route   POST /api/admin/partner-complaints/:id/reply
+// @access  Admin
+const replyToPartnerComplaint = async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ message: 'Message text is required' });
+
+    const complaint = await PartnerComplaint.findById(req.params.id);
+    if (!complaint) return res.status(404).json({ message: 'Complaint not found' });
+
+    complaint.messages.push({
+      sender: 'Admin',
+      senderName: req.admin.name || 'Admin',
+      text
+    });
+
+    if (complaint.status === 'Closed') {
+      complaint.status = 'In Progress';
+    }
+
+    await complaint.save();
+    res.json({ success: true, data: complaint });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   registerAdmin,
   loginAdmin,
@@ -364,5 +425,8 @@ module.exports = {
   deleteBroadcast,
   resendBroadcast,
   getAllPayouts,
-  updatePayoutStatus
+  updatePayoutStatus,
+  getAllPartnerComplaints,
+  updatePartnerComplaintStatus,
+  replyToPartnerComplaint
 };

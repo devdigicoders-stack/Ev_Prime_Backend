@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const { createAuditLog } = require('./auditController');
 const notificationService = require('../services/notificationService');
 const PartnerNotification = require('../models/PartnerNotification');
+const PartnerComplaint = require('../models/PartnerComplaint');
 
 // @desc    Create a new partner
 // @route   POST /api/partner
@@ -1120,6 +1121,85 @@ const getMyTransactions = async (req, res) => {
   }
 };
 
+// @desc    Partner: Get complaints
+// @route   GET /api/partner/me/complaints
+// @access  Partner
+const getMyComplaints = async (req, res) => {
+  try {
+    const { status } = req.query;
+    let query = { partner: req.partner._id };
+    if (status && status !== 'All') {
+      query.status = status;
+    }
+    const complaints = await PartnerComplaint.find(query).sort({ createdAt: -1 }).populate('station', 'name');
+    res.json({ success: true, data: complaints });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Partner: Create a new complaint
+// @route   POST /api/partner/me/complaints
+// @access  Partner
+const createComplaint = async (req, res) => {
+  try {
+    const { title, category, description, stationId } = req.body;
+    if (!title || !category || !description) {
+      return res.status(400).json({ message: 'Title, category, and description are required' });
+    }
+    const complaint = await PartnerComplaint.create({
+      partner: req.partner._id,
+      station: stationId || null,
+      title,
+      category,
+      description
+    });
+    res.status(201).json({ success: true, data: complaint });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Partner: Get single complaint details
+// @route   GET /api/partner/me/complaints/:id
+// @access  Partner
+const getComplaintDetails = async (req, res) => {
+  try {
+    const complaint = await PartnerComplaint.findOne({ _id: req.params.id, partner: req.partner._id }).populate('station', 'name');
+    if (!complaint) return res.status(404).json({ message: 'Complaint not found' });
+    res.json({ success: true, data: complaint });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Partner: Reply to a complaint
+// @route   POST /api/partner/me/complaints/:id/reply
+// @access  Partner
+const replyToComplaint = async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ message: 'Message text is required' });
+    
+    const complaint = await PartnerComplaint.findOne({ _id: req.params.id, partner: req.partner._id });
+    if (!complaint) return res.status(404).json({ message: 'Complaint not found' });
+
+    complaint.messages.push({
+      sender: 'Partner',
+      senderName: req.partner.name,
+      text
+    });
+    
+    // Auto reopen if closed? (Optional)
+    if (complaint.status === 'Closed') complaint.status = 'Open';
+    
+    await complaint.save();
+    res.json({ success: true, data: complaint });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   forgotPassword,
   verifyOtp,
@@ -1158,5 +1238,9 @@ module.exports = {
   updateFcmToken,
   getMyNotifications,
   markNotificationsRead,
-  getMyTransactions
+  getMyTransactions,
+  getMyComplaints,
+  createComplaint,
+  getComplaintDetails,
+  replyToComplaint
 };

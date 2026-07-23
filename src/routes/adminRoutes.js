@@ -15,7 +15,10 @@ const {
   deleteBroadcast,
   resendBroadcast,
   getAllPayouts,
-  updatePayoutStatus
+  updatePayoutStatus,
+  getAllPartnerComplaints,
+  updatePartnerComplaintStatus,
+  replyToPartnerComplaint
 } = require('../controllers/adminController');
 const { protect } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
@@ -44,5 +47,10 @@ router.post('/notifications/broadcasts/:id/resend', protect, resendBroadcast);
 // Payouts
 router.get('/payouts', protect, getAllPayouts);
 router.put('/payouts/:id/status', protect, updatePayoutStatus);
+
+// Partner Complaints
+router.get('/partner-complaints', protect, getAllPartnerComplaints);
+router.put('/partner-complaints/:id/status', protect, updatePartnerComplaintStatus);
+router.post('/partner-complaints/:id/reply', protect, replyToPartnerComplaint);
 
 module.exports = router;

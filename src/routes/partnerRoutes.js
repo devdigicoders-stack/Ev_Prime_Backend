@@ -33,7 +33,11 @@ const {
   updateFcmToken,
   getMyNotifications,
   markNotificationsRead,
-  getMyTransactions
+  getMyTransactions,
+  getMyComplaints,
+  createComplaint,
+  getComplaintDetails,
+  replyToComplaint
 } = require('../controllers/partnerController');
 const { protect, protectPartner } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
@@ -98,5 +102,11 @@ router.get('/:id/history', protect, getPartnerHistory);
 router.put('/me/fcm-token', protectPartner, updateFcmToken);
 router.get('/me/notifications', protectPartner, getMyNotifications);
 router.put('/me/notifications/read', protectPartner, markNotificationsRead);
+
+// Complaints
+router.get('/me/complaints', protectPartner, getMyComplaints);
+router.post('/me/complaints', protectPartner, createComplaint);
+router.get('/me/complaints/:id', protectPartner, getComplaintDetails);
+router.post('/me/complaints/:id/reply', protectPartner, replyToComplaint);
 
 module.exports = router;
