@@ -1,5 +1,7 @@
 const Review = require('../models/Review');
 const User = require('../models/User');
+const Station = require('../models/Station');
+const notificationService = require('../services/notificationService');
 
 // @desc    Get all reviews (latest first)
 // @route   GET /api/reviews
@@ -23,19 +25,39 @@ const getAllReviews = async (req, res) => {
 // @access  Private
 const createReview = async (req, res) => {
   try {
-    const { rating, comment } = req.body;
+    const { rating, comment, stationId } = req.body;
 
     if (!rating || !comment) {
       return res.status(400).json({ success: false, message: 'Please provide rating and comment' });
     }
 
-    const review = await Review.create({
-      user: req.user._id, // Set by authMiddleware
+    const reviewData = {
+      user: req.user._id,
       rating,
       comment
-    });
+    };
+
+    if (stationId) {
+      const station = await Station.findById(stationId);
+      if (station) {
+        reviewData.station = stationId;
+        reviewData.partner = station.partner; // Assuming partner is ObjectId in Station or string that maps to partner ID
+      }
+    }
+
+    const review = await Review.create(reviewData);
 
     const populatedReview = await Review.findById(review._id).populate('user', 'name profileImage');
+
+    if (reviewData.partner) {
+      await notificationService.sendToPartner(
+        reviewData.partner,
+        'New Station Review',
+        `You received a new ${rating}-star review for your station.`,
+        { type: 'new_review', reviewId: review._id.toString() },
+        'alert'
+      );
+    }
 
     res.status(201).json({ success: true, data: populatedReview, message: 'Review submitted successfully!' });
   } catch (error) {

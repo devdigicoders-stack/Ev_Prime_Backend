@@ -376,6 +376,16 @@ const updatePartnerComplaintStatus = async (req, res) => {
 
     complaint.status = status;
     await complaint.save();
+
+    // Send Notification to Partner
+    await notificationService.sendToPartner(
+      complaint.partner,
+      'Complaint Status Updated',
+      `Your complaint #${complaint.complaintId} status has been updated to ${status}.`,
+      { type: 'complaint_update', complaintId: complaint._id.toString() },
+      'alert'
+    );
+
     res.json({ success: true, data: complaint });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -404,6 +414,16 @@ const replyToPartnerComplaint = async (req, res) => {
     }
 
     await complaint.save();
+
+    // Send Notification to Partner
+    await notificationService.sendToPartner(
+      complaint.partner,
+      'New Reply from Admin',
+      `Admin replied to your complaint #${complaint.complaintId}.`,
+      { type: 'complaint_reply', complaintId: complaint._id.toString() },
+      'alert'
+    );
+
     res.json({ success: true, data: complaint });
   } catch (error) {
     res.status(500).json({ message: error.message });

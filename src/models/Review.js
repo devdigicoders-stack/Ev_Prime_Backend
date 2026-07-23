@@ -16,6 +16,16 @@ const reviewSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true
+  },
+  station: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Station',
+    required: false
+  },
+  partner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Partner',
+    required: false
   }
 }, {
   timestamps: true

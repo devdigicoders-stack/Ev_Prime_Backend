@@ -6,6 +6,7 @@ const { createAuditLog } = require('./auditController');
 const notificationService = require('../services/notificationService');
 const PartnerNotification = require('../models/PartnerNotification');
 const PartnerComplaint = require('../models/PartnerComplaint');
+const Review = require('../models/Review');
 
 // @desc    Create a new partner
 // @route   POST /api/partner
@@ -1200,6 +1201,22 @@ const replyToComplaint = async (req, res) => {
   }
 };
 
+// @desc    Get partner's customer reviews
+// @route   GET /api/partner/me/reviews
+// @access  Partner
+const getMyReviews = async (req, res) => {
+  try {
+    const reviews = await Review.find({ partner: req.partner._id })
+      .populate('user', 'name profileImage')
+      .populate('station', 'name location')
+      .sort({ createdAt: -1 });
+
+    res.json({ success: true, count: reviews.length, data: reviews });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   forgotPassword,
   verifyOtp,
@@ -1242,5 +1259,6 @@ module.exports = {
   getMyComplaints,
   createComplaint,
   getComplaintDetails,
-  replyToComplaint
+  replyToComplaint,
+  getMyReviews
 };
