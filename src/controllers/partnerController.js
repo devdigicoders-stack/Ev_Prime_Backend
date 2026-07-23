@@ -829,10 +829,13 @@ const addMyStaff = async (req, res) => {
   try {
     const partner = await Partner.findById(req.partner.id);
     if (!partner.staff) partner.staff = [];
+    partner.staff.forEach(s => {
+      if (s.role === 'Operator' || s.role === 'Viewer') s.role = 'Employee';
+    });
     partner.staff.push({
       name: req.body.name,
       email: req.body.email,
-      role: req.body.role || 'Operator'
+      role: req.body.role || 'Employee'
     });
     await partner.save();
     res.json({ success: true, message: 'Staff member added', data: partner.staff });
@@ -861,6 +864,10 @@ const updateMyStaff = async (req, res) => {
     if (req.body.name) partner.staff[staffIndex].name = req.body.name;
     if (req.body.email) partner.staff[staffIndex].email = req.body.email;
     if (req.body.role) partner.staff[staffIndex].role = req.body.role;
+
+    partner.staff.forEach(s => {
+      if (s.role === 'Operator' || s.role === 'Viewer') s.role = 'Employee';
+    });
 
     await partner.save();
     res.json({ success: true, message: 'Staff member updated', data: partner.staff[staffIndex] });
