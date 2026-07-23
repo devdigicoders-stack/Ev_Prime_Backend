@@ -1229,67 +1229,108 @@ const getMyReviews = async (req, res) => {
 // @access  Partner
 const getMyReports = async (req, res) => {
   try {
-    const period = req.query.period || 'All Time';
-    const stations = await Station.find({ partner: req.partner.name });
+    const period = req.query.period || 'This Month';
+    // Match stations by partner name or partner ID
+    const stations = await Station.find({
+      $or: [
+        { partner: req.partner.name },
+        { partnerId: req.partner._id },
+        { partner: req.partner._id.toString() }
+      ]
+    });
     const stationIds = stations.map(s => s._id);
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const now = new Date();
+    let dateFilter = null;
 
-    let currentPeriodFilter = null;
-    
-    if (period === 'Today') {
-      currentPeriodFilter = { $gte: today };
-    } else if (period === 'This Week') {
-      const startOfWeek = new Date(today);
-      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-      currentPeriodFilter = { $gte: startOfWeek };
-    } else if (period === 'This Month') {
-      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      currentPeriodFilter = { $gte: startOfMonth };
+    if (period === 'Today' || period === 'daily' || period === '1d') {
+      const startOfDay = new Date(now.setHours(0, 0, 0, 0));
+      const endOfDay = new Date(now.setHours(23, 59, 59, 999));
+      dateFilter = { $gte: startOfDay, $lte: endOfDay };
+    } else if (period === 'This Week' || period === 'weekly' || period === '7d') {
+      const pastWeek = new Date();
+      pastWeek.setDate(pastWeek.getDate() - 7);
+      dateFilter = { $gte: pastWeek };
+    } else if (period === 'This Month' || period === 'monthly' || period === '30d') {
+      const pastMonth = new Date();
+      pastMonth.setDate(pastMonth.getDate() - 30);
+      dateFilter = { $gte: pastMonth };
     }
 
-    const filter = { station: { $in: stationIds }, paymentStatus: 'Paid' };
-    if (period !== 'All Time' && currentPeriodFilter) {
-      filter.createdAt = currentPeriodFilter;
+    const query = { station: { $in: stationIds } };
+    if (dateFilter) {
+      query.createdAt = dateFilter;
     }
 
-    const bookings = await Booking.find(filter)
-      .populate('user', 'name')
-      .populate('station', 'name')
+    const bookings = await Booking.find(query)
+      .populate('user', 'name mobile phone email')
+      .populate('station', 'name city state')
       .sort({ createdAt: -1 });
 
     let totalRevenue = 0;
     let totalEnergy = 0;
+    let carbonSaved = 0;
+
+    const stationMap = {};
 
     const reportData = bookings.map(b => {
-      totalRevenue += (b.estimatedCost || 0);
-      totalEnergy += (b.powerConsumed || 0);
+      const amount = b.estimatedCost || 0;
+      const energy = b.unitsConsumed || b.estimatedEnergy || b.powerConsumed || 0;
+      const carbon = b.carbonSavedKg || 0;
+
+      if (b.status === 'Completed' || b.status === 'Confirmed' || b.status === 'Ongoing') {
+        totalRevenue += amount;
+        totalEnergy += energy;
+        carbonSaved += carbon;
+      }
+
+      const stId = b.station?._id ? b.station._id.toString() : 'unknown';
+      const stName = b.station?.name || 'Unknown Station';
+      const stCity = b.station?.city || 'N/A';
+
+      if (!stationMap[stId]) {
+        stationMap[stId] = {
+          id: stId,
+          name: stName,
+          city: stCity,
+          totalBookings: 0,
+          totalEnergy: 0,
+          totalRevenue: 0,
+        };
+      }
+      stationMap[stId].totalBookings += 1;
+      stationMap[stId].totalEnergy += energy;
+      stationMap[stId].totalRevenue += amount;
 
       return {
-        bookingId: b.bookingId,
+        bookingId: b.bookingId || b._id,
         date: b.createdAt,
-        stationName: b.station ? b.station.name : 'Unknown',
-        customerName: b.user ? b.user.name : 'Unknown',
-        connectorType: b.connectorType,
-        powerConsumed: b.powerConsumed || 0,
-        amount: b.estimatedCost || 0,
-        status: b.status
+        stationName: stName,
+        customerName: b.user?.name || 'Customer',
+        connectorType: b.connectorType || 'CCS2',
+        powerConsumed: energy,
+        amount: amount,
+        status: b.status || 'Confirmed'
       };
     });
+
+    const mostUsedStations = Object.values(stationMap)
+      .sort((a, b) => b.totalBookings - a.totalBookings);
 
     res.json({
       success: true,
       summary: {
         totalRevenue,
         totalBookings: reportData.length,
-        totalEnergy,
+        totalEnergy: Math.round(totalEnergy * 100) / 100,
+        carbonSaved: Math.round(carbonSaved * 100) / 100,
         period
       },
+      mostUsedStations,
       data: reportData
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
