@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const { createAuditLog } = require('./auditController');
 const notificationService = require('../services/notificationService');
 const PartnerNotification = require('../models/PartnerNotification');
+const PartnerPayout = require('../models/PartnerPayout');
 
 // @desc    Create a new partner
 // @route   POST /api/partner
@@ -1052,6 +1053,105 @@ const markNotificationsRead = async (req, res) => {
   }
 };
 
+// @desc    Partner: Request payout
+// @route   POST /api/partner/me/payouts
+// @access  Partner
+const requestPayout = async (req, res) => {
+  try {
+    const { amount, bankDetails, remarks } = req.body;
+    if (!amount || amount <= 0) return res.status(400).json({ message: 'Valid amount is required' });
+    const payout = await PartnerPayout.create({
+      partner: req.partner._id,
+      amount,
+      bankDetails,
+      remarks,
+      status: 'Pending'
+    });
+    res.status(201).json({ success: true, data: payout });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Partner: Get payouts
+// @route   GET /api/partner/me/payouts
+// @access  Partner
+const getMyPayouts = async (req, res) => {
+  try {
+    const payouts = await PartnerPayout.find({ partner: req.partner._id }).sort({ createdAt: -1 });
+    res.json({ success: true, data: payouts });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Partner: Get unified transactions history
+// @route   GET /api/partner/me/transactions
+// @access  Partner
+const getMyTransactions = async (req, res) => {
+  try {
+    const { filter = 'All', page = 1, limit = 20 } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+    
+    const stations = await Station.find({ partner: req.partner.name });
+    const stationIds = stations.map(s => s._id);
+
+    let combined = [];
+
+    // Fetch Bookings (Revenue)
+    if (filter === 'All' || filter === 'Revenue') {
+      const bookings = await Booking.find({ station: { $in: stationIds }, paymentStatus: 'Paid' });
+      bookings.forEach(b => {
+        combined.push({
+          id: b._id.toString(),
+          type: 'Revenue',
+          date: b.endTime || b.createdAt,
+          title: `Session #${b.bookingId || b._id.toString().substring(0, 8).toUpperCase()}`,
+          amount: b.estimatedCost || b.totalAmount || 0,
+          isRevenue: true,
+          status: b.status,
+          sortDate: new Date(b.endTime || b.createdAt).getTime()
+        });
+      });
+    }
+
+    // Fetch Payouts
+    if (filter === 'All' || filter === 'Payouts') {
+      const payouts = await PartnerPayout.find({ partner: req.partner._id });
+      payouts.forEach(p => {
+        combined.push({
+          id: p._id.toString(),
+          type: 'Payout',
+          date: p.requestedAt || p.createdAt,
+          title: `Payout to Bank (${p.status})`,
+          amount: p.amount || 0,
+          isRevenue: false,
+          status: p.status,
+          sortDate: new Date(p.requestedAt || p.createdAt).getTime()
+        });
+      });
+    }
+
+    // Sort descending by date
+    combined.sort((a, b) => b.sortDate - a.sortDate);
+
+    // Apply pagination manually after combine
+    const total = combined.length;
+    const paginatedData = combined.slice(skip, skip + Number(limit));
+
+    res.json({
+      success: true,
+      data: paginatedData,
+      total,
+      page: Number(page),
+      totalPages: Math.ceil(total / Number(limit))
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   forgotPassword,
   verifyOtp,
@@ -1089,5 +1189,6 @@ module.exports = {
   updateMyBookingStatus,
   updateFcmToken,
   getMyNotifications,
-  markNotificationsRead
+  markNotificationsRead,
+  getMyTransactions
 };

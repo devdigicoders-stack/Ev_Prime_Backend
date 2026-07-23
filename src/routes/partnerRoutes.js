@@ -32,7 +32,8 @@ const {
   updateMyBookingStatus,
   updateFcmToken,
   getMyNotifications,
-  markNotificationsRead
+  markNotificationsRead,
+  getMyTransactions
 } = require('../controllers/partnerController');
 const { protect, protectPartner } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
@@ -69,9 +70,10 @@ router.post('/me/staff', protectPartner, addMyStaff);
 router.put('/me/staff/:staffId', protectPartner, updateMyStaff);
 router.delete('/me/staff/:staffId', protectPartner, removeMyStaff);
 
-// Payouts
+// Payouts & Transactions
 router.get('/me/payouts', protectPartner, getMyPayouts);
 router.post('/me/payouts', protectPartner, requestPayout);
+router.get('/me/transactions', protectPartner, getMyTransactions);
 
 // Pricing Templates
 router.get('/me/pricing-templates', protectPartner, getMyPricingTemplates);
