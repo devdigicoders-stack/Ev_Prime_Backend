@@ -1,4 +1,5 @@
 const Offer = require('../models/Offer');
+const notificationService = require('../services/notificationService');
 
 // @desc    Get all active offers (Public/User)
 // @route   GET /api/offers
@@ -57,6 +58,18 @@ const createOffer = async (req, res) => {
       validUntil,
       isActive: isActive !== undefined ? isActive : true
     });
+
+    // Send real-time notification to all users
+    try {
+      await notificationService.sendToAllUsers(
+        `🎉 Exclusive Offer: ${offer.title}`,
+        `${offer.description} Use code ${offer.code} on your next charge!`,
+        { offerId: offer._id.toString(), code: offer.code },
+        'promo'
+      );
+    } catch (notifErr) {
+      console.error('Failed to trigger promo notification:', notifErr);
+    }
 
     res.status(201).json({ success: true, data: offer });
   } catch (error) {

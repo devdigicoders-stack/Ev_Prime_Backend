@@ -116,41 +116,32 @@ class NotificationService {
    */
   async sendToAllUsers(title, body, data = {}, type = 'general') {
     try {
-      if (!getApps().length) {
-        return { success: false, error: 'Firebase not initialized' };
-      }
-
-      // Fetch all users with a valid FCM token
-      const users = await User.find({ fcmToken: { $ne: '', $exists: true } });
-      const tokens = users.map(u => u.fcmToken).filter(Boolean);
-
-      if (tokens.length === 0) {
-        return { success: true, message: 'No users with valid FCM token found' };
-      }
-
-      // Save a single Notification record for reference (or one for each user)
-      // Since it's a global notification, we can save it for all users via insertMany
-      const notifications = users.map(user => ({
-        user: user._id,
-        title,
-        body,
-        data,
-        type
-      }));
-      
-      if (notifications.length > 0) {
+      const allUsers = await User.find({});
+      if (allUsers.length > 0) {
+        const notifications = allUsers.map(user => ({
+          user: user._id,
+          title,
+          body,
+          data,
+          type,
+          isRead: false
+        }));
         await Notification.insertMany(notifications);
       }
 
-      const message = {
-        notification: { title, body },
-        data: { ...data, type },
-        tokens
-      };
-
-      const response = await getMessaging().sendEachForMulticast(message);
-      console.log(`Successfully sent message to ${response.successCount} users`, response);
-      return { success: true, response };
+      if (getApps().length > 0) {
+        const usersWithToken = allUsers.filter(u => u.fcmToken);
+        const tokens = usersWithToken.map(u => u.fcmToken).filter(Boolean);
+        if (tokens.length > 0) {
+          const message = {
+            notification: { title, body },
+            data: { ...data, type },
+            tokens
+          };
+          await getMessaging().sendEachForMulticast(message);
+        }
+      }
+      return { success: true, count: allUsers.length };
     } catch (error) {
       console.error('Error sending notification to users:', error);
       return { success: false, error: error.message };

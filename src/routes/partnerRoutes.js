@@ -28,7 +28,7 @@ const {
   getMyStaff, addMyStaff, removeMyStaff, updateMyStaff,
   getMyPayouts, requestPayout,
   getMyPricingTemplates, createPricingTemplate, updatePricingTemplate, deletePricingTemplate,
-  getMyPromotions, createPromotion,
+  getMyPromotions, createPromotion, deletePromotion,
   updateMyBookingStatus,
   updateFcmToken,
   getMyNotifications,
@@ -94,6 +94,7 @@ router.delete('/me/pricing-templates/:id', protectPartner, deletePricingTemplate
 // Promotions
 router.get('/me/offers', protectPartner, getMyPromotions);
 router.post('/me/offers', protectPartner, createPromotion);
+router.delete('/me/offers/:id', protectPartner, deletePromotion);
 
 // Admin protected
 router.post('/', protect, createPartner);

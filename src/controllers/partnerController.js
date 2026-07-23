@@ -1031,7 +1031,7 @@ const deletePricingTemplate = async (req, res) => {
 // Promotions/Offers
 const getMyPromotions = async (req, res) => {
   try {
-    const offers = await Offer.find({ isActive: true }).sort('-createdAt');
+    const offers = await Offer.find({}).sort('-createdAt');
     res.json({ success: true, data: offers });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -1040,8 +1040,50 @@ const getMyPromotions = async (req, res) => {
 
 const createPromotion = async (req, res) => {
   try {
-    const offer = await Offer.create(req.body);
-    res.json({ success: true, message: 'Promotion created', data: offer });
+    const { title, description, code, discountType, discountValue, validUntil, type, startDate, endDate } = req.body;
+
+    const promoCode = (code || title.replace(/\s+/g, '').toUpperCase().substring(0, 8) + Math.floor(100 + Math.random() * 900));
+    const validUntilDate = validUntil ? new Date(validUntil) : (endDate ? new Date(endDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
+    const discType = discountType || (type === 'Cashback' ? 'FLAT' : 'PERCENTAGE');
+    const discVal = discountValue ? Number(discountValue) : 20;
+
+    const offer = await Offer.create({
+      title,
+      description,
+      code: promoCode,
+      discountType: discType,
+      discountValue: discVal,
+      validUntil: validUntilDate,
+      isActive: true,
+      createdByPartner: req.partner._id,
+      partnerName: req.partner.name || req.partner.companyName
+    });
+
+    // Notify all users in real-time
+    try {
+      await notificationService.sendToAllUsers(
+        `🎁 New Offer: ${offer.title}`,
+        `${offer.description} Use code ${offer.code} on your next charge!`,
+        { offerId: offer._id.toString(), code: offer.code },
+        'promo'
+      );
+    } catch (notifErr) {
+      console.error('Failed to trigger promo notification to users:', notifErr);
+    }
+
+    res.status(201).json({ success: true, message: 'Promotion created successfully', data: offer });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const deletePromotion = async (req, res) => {
+  try {
+    const offer = await Offer.findByIdAndDelete(req.params.id);
+    if (!offer) {
+      return res.status(404).json({ success: false, message: 'Promotion not found' });
+    }
+    res.json({ success: true, message: 'Promotion deleted successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -1444,6 +1486,7 @@ module.exports = {
   deletePricingTemplate,
   getMyPromotions,
   createPromotion,
+  deletePromotion,
   updateMyBookingStatus,
   updateFcmToken,
   getMyNotifications,
