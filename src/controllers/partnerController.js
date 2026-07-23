@@ -5,7 +5,6 @@ const jwt = require('jsonwebtoken');
 const { createAuditLog } = require('./auditController');
 const notificationService = require('../services/notificationService');
 const PartnerNotification = require('../models/PartnerNotification');
-const PartnerPayout = require('../models/PartnerPayout');
 
 // @desc    Create a new partner
 // @route   POST /api/partner
@@ -1053,37 +1052,6 @@ const markNotificationsRead = async (req, res) => {
   }
 };
 
-// @desc    Partner: Request payout
-// @route   POST /api/partner/me/payouts
-// @access  Partner
-const requestPayout = async (req, res) => {
-  try {
-    const { amount, bankDetails, remarks } = req.body;
-    if (!amount || amount <= 0) return res.status(400).json({ message: 'Valid amount is required' });
-    const payout = await PartnerPayout.create({
-      partner: req.partner._id,
-      amount,
-      bankDetails,
-      remarks,
-      status: 'Pending'
-    });
-    res.status(201).json({ success: true, data: payout });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @desc    Partner: Get payouts
-// @route   GET /api/partner/me/payouts
-// @access  Partner
-const getMyPayouts = async (req, res) => {
-  try {
-    const payouts = await PartnerPayout.find({ partner: req.partner._id }).sort({ createdAt: -1 });
-    res.json({ success: true, data: payouts });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
 
 // @desc    Partner: Get unified transactions history
 // @route   GET /api/partner/me/transactions
