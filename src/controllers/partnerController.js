@@ -2,6 +2,7 @@ const Partner = require('../models/Partner');
 const Station = require('../models/Station');
 const Booking = require('../models/Booking');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const { createAuditLog } = require('./auditController');
 const notificationService = require('../services/notificationService');
 const PartnerNotification = require('../models/PartnerNotification');
@@ -107,7 +108,7 @@ const setPartnerCredentials = async (req, res) => {
     if (existing) return res.status(400).json({ message: 'Username already taken by another partner' });
 
     partner.appUsername = appUsername;
-    partner.appPassword = appPassword; // will be hashed by pre-save hook
+    partner.appPassword = await bcrypt.hash(appPassword, 10);
     partner.hasCredentials = true;
     await partner.save();
 
@@ -134,7 +135,7 @@ const changePartnerPassword = async (req, res) => {
     const partner = await Partner.findById(req.params.id);
     if (!partner) return res.status(404).json({ message: 'Partner not found' });
 
-    partner.appPassword = newPassword; // will be hashed by pre-save hook
+    partner.appPassword = await bcrypt.hash(newPassword, 10);
     await partner.save();
 
     await createAuditLog({
@@ -210,13 +211,14 @@ const registerPartner = async (req, res) => {
     const existingUser = await Partner.findOne({ appUsername });
     if (existingUser) return res.status(400).json({ message: 'Username already taken' });
 
+    const hashedPassword = await bcrypt.hash(appPassword, 10);
     const partner = await Partner.create({
       name,
       contactPerson,
       email,
       phone,
       appUsername,
-      appPassword,
+      appPassword: hashedPassword,
       businessType,
       businessAddress,
       gstNumber,
@@ -354,7 +356,8 @@ const resetPassword = async (req, res) => {
     const partner = await Partner.findById(decoded.id);
     if (!partner) return res.status(404).json({ message: 'Partner not found' });
 
-    partner.appPassword = newPassword; // Will be hashed by pre-save hook
+    const salt = await bcrypt.genSalt(10);
+    partner.appPassword = await bcrypt.hash(newPassword, salt);
     partner.resetPasswordOtp = undefined;
     partner.resetPasswordExpires = undefined;
     await partner.save();

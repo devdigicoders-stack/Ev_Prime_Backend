@@ -227,15 +227,18 @@ module.exports = {
 const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    if (!currentPassword || !newPassword) return res.status(400).json({ success: false, message: 'Both fields required' });
-    if (newPassword.length < 6) return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
-    // Since app uses OTP login (no password), we store password optionally
+    if (!newPassword || newPassword.length < 6) return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    // If user has no password set, allow setting new one with any current
-    if (user.password && user.password !== currentPassword) {
-      return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+
+    if (user.password && user.password.length > 0) {
+      const isMatch = await user.matchPassword(currentPassword || '');
+      if (!isMatch) {
+        return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+      }
     }
+
     user.password = newPassword;
     await user.save();
     res.json({ success: true, message: 'Password changed successfully' });
@@ -478,37 +481,6 @@ const adminSaveUserKYC = async (req, res) => {
 
     res.json({ success: true, message: 'KYC updated successfully by admin', data: kyc });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
-};
-
-// @desc    Change logged in user's password
-// @route   PUT /api/user/change-password
-// @access  Private (User)
-const changePassword = async (req, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-    if (!newPassword || newPassword.length < 6) {
-      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters long' });
-    }
-
-    const user = await User.findById(req.user._id);
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
-
-    if (user.password && user.password.length > 0) {
-      const isMatch = await user.matchPassword(currentPassword || '');
-      if (!isMatch) {
-        return res.status(400).json({ success: false, message: 'Incorrect current password' });
-      }
-    }
-
-    user.password = newPassword;
-    await user.save();
-
-    res.json({ success: true, message: 'Password changed successfully' });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
 };
 
 Object.assign(module.exports, { 

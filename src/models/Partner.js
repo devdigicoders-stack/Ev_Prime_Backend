@@ -64,13 +64,25 @@ const partnerSchema = new mongoose.Schema({
   }],
 }, { timestamps: true });
 
-partnerSchema.pre('save', async function () {
-  if (!this.isModified('appPassword') || !this.appPassword) return;
+partnerSchema.pre('save', async function (next) {
+  if (!this.isModified('appPassword') || !this.appPassword) {
+    if (typeof next === 'function') next();
+    return;
+  }
+  if (this.appPassword.startsWith('$2a$') || this.appPassword.startsWith('$2b$')) {
+    if (typeof next === 'function') next();
+    return;
+  }
   const salt = await bcrypt.genSalt(10);
   this.appPassword = await bcrypt.hash(this.appPassword, salt);
+  if (typeof next === 'function') next();
 });
 
 partnerSchema.methods.matchPassword = async function (enteredPassword) {
+  if (!this.appPassword) return false;
+  if (!this.appPassword.startsWith('$2a$') && !this.appPassword.startsWith('$2b$')) {
+    return enteredPassword === this.appPassword;
+  }
   return await bcrypt.compare(enteredPassword, this.appPassword);
 };
 
