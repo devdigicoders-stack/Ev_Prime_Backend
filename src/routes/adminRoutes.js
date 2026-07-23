@@ -18,7 +18,10 @@ const {
   updatePayoutStatus,
   getAllPartnerComplaints,
   updatePartnerComplaintStatus,
-  replyToPartnerComplaint
+  replyToPartnerComplaint,
+  getAllPartnerRequests,
+  updatePartnerRequestStatus,
+  replyToPartnerRequest
 } = require('../controllers/adminController');
 const { protect } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
@@ -52,5 +55,10 @@ router.put('/payouts/:id/status', protect, updatePayoutStatus);
 router.get('/partner-complaints', protect, getAllPartnerComplaints);
 router.put('/partner-complaints/:id/status', protect, updatePartnerComplaintStatus);
 router.post('/partner-complaints/:id/reply', protect, replyToPartnerComplaint);
+
+// Partner Requests
+router.get('/partner-requests', protect, getAllPartnerRequests);
+router.put('/partner-requests/:id/status', protect, updatePartnerRequestStatus);
+router.post('/partner-requests/:id/reply', protect, replyToPartnerRequest);
 
 module.exports = router;

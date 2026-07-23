@@ -3,6 +3,7 @@ const Station = require('../models/Station');
 const Booking = require('../models/Booking');
 const jwt = require('jsonwebtoken');
 const { createAuditLog } = require('./auditController');
+const PartnerRequest = require('../models/PartnerRequest');
 const notificationService = require('../services/notificationService');
 const PartnerNotification = require('../models/PartnerNotification');
 const PartnerComplaint = require('../models/PartnerComplaint');
@@ -1217,6 +1218,64 @@ const getMyReviews = async (req, res) => {
   }
 };
 
+// @desc    Get partner's requests
+// @route   GET /api/partner/me/requests
+// @access  Partner
+const getMyRequests = async (req, res) => {
+  try {
+    const requests = await PartnerRequest.find({ partner: req.partner._id })
+      .populate('station', 'name location')
+      .sort({ createdAt: -1 });
+
+    res.json({ success: true, data: requests });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Create a new partner request
+// @route   POST /api/partner/me/requests
+// @access  Partner
+const createRequest = async (req, res) => {
+  try {
+    const { title, category, description, stationId } = req.body;
+
+    if (!title || !category || !description) {
+      return res.status(400).json({ message: 'Title, category, and description are required' });
+    }
+
+    // Generate unique Request ID
+    const count = await PartnerRequest.countDocuments();
+    const requestId = `REQ${100000 + count + 1}`;
+
+    const request = new PartnerRequest({
+      requestId,
+      partner: req.partner._id,
+      title,
+      category,
+      description,
+      status: 'Pending'
+    });
+
+    if (stationId) {
+      request.station = stationId;
+    }
+
+    await request.save();
+
+    // Send notification to Admins
+    await notificationService.sendToAllAdmins(
+      'New Partner Request',
+      `Partner ${req.partner.name || 'Unknown'} submitted a new request: ${title}`,
+      { type: 'new_partner_request', requestId: request._id.toString() }
+    );
+
+    res.status(201).json({ success: true, data: request });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   forgotPassword,
   verifyOtp,
@@ -1260,5 +1319,7 @@ module.exports = {
   createComplaint,
   getComplaintDetails,
   replyToComplaint,
-  getMyReviews
+  getMyReviews,
+  getMyRequests,
+  createRequest
 };
