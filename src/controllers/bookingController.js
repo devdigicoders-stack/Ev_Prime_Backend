@@ -386,6 +386,109 @@ const updateBookingStatusAdmin = async (req, res) => {
   }
 };
 
+// @desc    Start charging manually/remotely
+// @route   PUT /api/booking/:id/start-charging
+// @access  Admin / Partner / User
+const startChargingRemote = async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id)
+      .populate('user', 'name mobile email')
+      .populate('station', 'name city partner');
+
+    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+    if (booking.status === 'Completed' || booking.status === 'Cancelled') {
+      return res.status(400).json({ success: false, message: `Cannot start session. Booking is already ${booking.status}` });
+    }
+
+    booking.status = 'Ongoing';
+    booking.chargingStartTime = new Date();
+    await booking.save();
+
+    // Notify User
+    if (booking.user) {
+      await notificationService.sendToUser(
+        booking.user._id,
+        'Charging Started! ⚡',
+        `Charging has manually started for booking ${booking.bookingId || booking._id} at ${booking.station?.name || 'station'}.`,
+        { bookingId: booking._id.toString() },
+        'booking'
+      );
+    }
+
+    res.json({ success: true, message: 'Charging started successfully', data: booking });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// @desc    Stop charging manually/remotely
+// @route   PUT /api/booking/:id/stop-charging
+// @access  Admin / Partner / User
+const stopChargingRemote = async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id)
+      .populate('user', 'name mobile email')
+      .populate('station', 'name city partner');
+
+    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+    if (booking.status === 'Completed') {
+      return res.status(400).json({ success: false, message: 'Charging session is already completed' });
+    }
+
+    const endTime = new Date();
+    booking.status = 'Completed';
+    booking.chargingEndTime = endTime;
+
+    let energyKwh = booking.estimatedEnergy || 15.0;
+    if (booking.chargingStartTime) {
+      const durationMins = Math.max(1, Math.round((endTime - new Date(booking.chargingStartTime)) / 60000));
+      booking.duration = durationMins;
+    }
+    booking.unitsConsumed = energyKwh;
+
+    // Calculate carbon savings
+    try {
+      const { carbonSavedKg, treesEquivalent, fuelSavedLiters } = calculateCarbon(energyKwh);
+      booking.carbonSavedKg = carbonSavedKg;
+      booking.treesEquivalent = treesEquivalent;
+      booking.fuelSavedLiters = fuelSavedLiters;
+
+      if (booking.user) {
+        await User.findByIdAndUpdate(booking.user._id, {
+          $inc: {
+            totalCarbonSavedKg: carbonSavedKg,
+            totalFuelSavedLiters: fuelSavedLiters,
+            totalEnergyConsumedKwh: energyKwh,
+            totalTreesEquivalent: treesEquivalent,
+          }
+        });
+      }
+    } catch (e) {
+      console.error('Carbon calc error:', e.message);
+    }
+
+    await booking.save();
+
+    // Auto generate invoice
+    createInvoiceForBooking(booking).catch(err => console.error('Invoice error:', err.message));
+
+    // Notify User
+    if (booking.user) {
+      await notificationService.sendToUser(
+        booking.user._id,
+        'Charging Stopped! ✅',
+        `Charging session ${booking.bookingId || booking._id} completed. Energy consumed: ${energyKwh} kWh.`,
+        { bookingId: booking._id.toString() },
+        'booking'
+      );
+    }
+
+    res.json({ success: true, message: 'Charging stopped & session completed successfully', data: booking });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 module.exports = {
   createOrder,
   createBooking,
@@ -395,4 +498,6 @@ module.exports = {
   rescheduleBooking,
   getAllBookingsAdmin,
   updateBookingStatusAdmin,
+  startChargingRemote,
+  stopChargingRemote,
 };

@@ -9,12 +9,20 @@ const {
   rescheduleBooking,
   getAllBookingsAdmin,
   updateBookingStatusAdmin,
+  startChargingRemote,
+  stopChargingRemote,
 } = require('../controllers/bookingController');
-const { protect, protectUser } = require('../middlewares/authMiddleware');
+const { protect, protectUser, protectAdminOrUser } = require('../middlewares/authMiddleware');
+
+// Charging Control (Admin/Partner/User)
+router.put('/:id/start-charging', protectAdminOrUser, startChargingRemote);
+router.put('/:id/stop-charging', protectAdminOrUser, stopChargingRemote);
 
 // Admin routes
 router.get('/admin/all', protect, getAllBookingsAdmin);
 router.put('/admin/:id/status', protect, updateBookingStatusAdmin);
+router.put('/admin/:id/start-charging', protect, startChargingRemote);
+router.put('/admin/:id/stop-charging', protect, stopChargingRemote);
 
 // User routes
 router.post('/create-order', protectUser, createOrder);

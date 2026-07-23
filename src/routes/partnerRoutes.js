@@ -52,6 +52,8 @@ router.post('/verify-otp', verifyOtp);
 router.post('/reset-password', resetPassword);
 
 // Partner self-service (partner app)
+const { startChargingRemote, stopChargingRemote } = require('../controllers/bookingController');
+
 router.get('/me', protectPartner, getMyProfile);
 router.get('/me/dashboard', protectPartner, getMyDashboard);
 router.get('/me/stations', protectPartner, getMyStations);
@@ -60,6 +62,8 @@ router.put('/me/stations/:id', protectPartner, upload.single('image'), updateMyS
 router.get('/me/stations/:id/analytics', protectPartner, getStationAnalytics);
 router.get('/me/bookings', protectPartner, getMyBookings);
 router.put('/me/bookings/:id/status', protectPartner, updateMyBookingStatus);
+router.put('/me/bookings/:id/start-charging', protectPartner, startChargingRemote);
+router.put('/me/bookings/:id/stop-charging', protectPartner, stopChargingRemote);
 router.get('/me/revenue', protectPartner, getMyRevenue);
 
 // Profile
