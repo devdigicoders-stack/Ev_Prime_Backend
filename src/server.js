@@ -8,7 +8,26 @@ const path = require('path');
 const connectDB = require('./config/db');
 
 // Connect to database
-connectDB();
+const mongoose = require('mongoose');
+connectDB().then(async () => {
+  // Auto-seed ConnectorMaster if empty
+  try {
+    const ConnectorMaster = require('./models/ConnectorMaster');
+    const count = await ConnectorMaster.countDocuments();
+    if (count === 0) {
+      await ConnectorMaster.insertMany([
+        { name: 'CCS2', subtitle: 'DC Fast \u2022 120 kW', powerKw: 120, chargeType: 'DC', icon: 'ev_station' },
+        { name: 'CHAdeMO', subtitle: 'DC Fast \u2022 60 kW', powerKw: 60, chargeType: 'DC', icon: 'ev_station_outlined' },
+        { name: 'GB/T', subtitle: 'DC Fast \u2022 60 kW', powerKw: 60, chargeType: 'DC', icon: 'electric_car' },
+        { name: 'AC Type 2', subtitle: 'AC Fast \u2022 22 kW', powerKw: 22, chargeType: 'AC', icon: 'electrical_services' },
+        { name: 'AC Type 1', subtitle: 'AC Fast \u2022 7.4 kW', powerKw: 7.4, chargeType: 'AC', icon: 'electrical_services_outlined' }
+      ]);
+      console.log('Auto-seeded 5 default connector types.');
+    }
+  } catch (e) {
+    console.error('Auto-seed connectors failed:', e.message);
+  }
+});
 
 const app = express();
 
