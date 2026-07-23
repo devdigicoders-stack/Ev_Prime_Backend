@@ -808,12 +808,14 @@ const updateMyProfile = async (req, res) => {
     }
 
     if (req.body.password) {
-      if (!req.body.currentPassword) {
-        return res.status(400).json({ success: false, message: 'Current password is required' });
-      }
-      const isMatch = await partner.matchPassword(req.body.currentPassword);
-      if (!isMatch) {
-        return res.status(401).json({ success: false, message: 'Invalid current password' });
+      if (partner.appPassword && partner.appPassword.length > 0) {
+        if (!req.body.currentPassword) {
+          return res.status(400).json({ success: false, message: 'Current password is required' });
+        }
+        const isMatch = await partner.matchPassword(req.body.currentPassword);
+        if (!isMatch) {
+          return res.status(401).json({ success: false, message: 'Invalid current password' });
+        }
       }
       partner.appPassword = req.body.password;
     }
