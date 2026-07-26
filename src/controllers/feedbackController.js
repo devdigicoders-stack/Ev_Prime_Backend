@@ -1,4 +1,4 @@
-  qasconst Feedback = require('../models/Feedback');
+const Feedback = require('../models/Feedback');
 const notificationService = require('../services/notificationService');
 
 // Submit feedback
