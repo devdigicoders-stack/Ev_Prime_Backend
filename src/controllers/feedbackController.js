@@ -1,4 +1,4 @@
-const Feedback = require('../models/Feedback');
+  qasconst Feedback = require('../models/Feedback');
 const notificationService = require('../services/notificationService');
 
 // Submit feedback
@@ -30,6 +30,7 @@ const submitFeedback = async (req, res) => {
 const getMyFeedback = async (req, res) => {
   try {
     const feedback = await Feedback.find({ user: req.user._id })
+      .populate('stationId', 'name city')
       .sort({ createdAt: -1 });
     res.json({ success: true, data: feedback });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
@@ -44,6 +45,7 @@ const getPublicFeedback = async (req, res) => {
 
     const feedback = await Feedback.find(filter)
       .populate('user', 'name profileImage')
+      .populate('stationId', 'name city')
       .sort({ createdAt: -1 })
       .limit(Number(limit));
 
