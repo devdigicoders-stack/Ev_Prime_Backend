@@ -53,6 +53,10 @@ const userSchema = new mongoose.Schema({
   totalFuelSavedLiters: { type: Number, default: 0 },
   totalEnergyConsumedKwh: { type: Number, default: 0 },
   totalTreesEquivalent: { type: Number, default: 0 },
+  favoriteStations: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Station'
+  }],
 }, {
   timestamps: true
 });

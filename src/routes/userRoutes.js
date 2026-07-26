@@ -21,7 +21,9 @@ const {
   updateKYCStatus,
   submitOwnKYC,
   getOwnKYC,
-  adminSaveUserKYC
+  adminSaveUserKYC,
+  toggleFavoriteStation,
+  getFavoriteStations
 } = require('../controllers/userController');
 const { protect, protectUser } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
@@ -45,6 +47,11 @@ router.post('/kyc/submit', protectUser, upload.fields([
   { name: 'panImage', maxCount: 1 },
   { name: 'selfie', maxCount: 1 }
 ]), submitOwnKYC);
+
+// Favorites (Mobile App)
+router.route('/favorites')
+  .get(protectUser, getFavoriteStations)
+  .post(protectUser, toggleFavoriteStation);
 
 router.route('/')
   .get(protect, getAllUsers);

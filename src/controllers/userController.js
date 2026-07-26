@@ -483,13 +483,73 @@ const adminSaveUserKYC = async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
+// @desc    Toggle favorite station for user
+// @route   POST /api/users/favorites
+// @access  Private
+const toggleFavoriteStation = async (req, res) => {
+  try {
+    const { stationId } = req.body;
+    if (!stationId) {
+      return res.status(400).json({ success: false, message: 'Station ID is required' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const index = user.favoriteStations.indexOf(stationId);
+    let isFavorite = false;
+
+    if (index > -1) {
+      // Remove from favorites
+      user.favoriteStations.splice(index, 1);
+    } else {
+      // Add to favorites
+      user.favoriteStations.push(stationId);
+      isFavorite = true;
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: isFavorite ? 'Station added to favorites' : 'Station removed from favorites',
+      isFavorite,
+      favorites: user.favoriteStations
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get all favorite stations for user
+// @route   GET /api/users/favorites
+// @access  Private
+const getFavoriteStations = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).populate('favoriteStations');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: user.favoriteStations || []
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 Object.assign(module.exports, { 
   changePassword, deleteOwnAccount,
   blockUser, unblockUser,
   getUserChargingHistory,
   getUserWallet, adminWalletRefund, getUserRefunds,
   getUserKYC, updateKYCStatus,
-  submitOwnKYC, getOwnKYC, adminSaveUserKYC
+  submitOwnKYC, getOwnKYC, adminSaveUserKYC,
+  toggleFavoriteStation, getFavoriteStations
 });
 
 
