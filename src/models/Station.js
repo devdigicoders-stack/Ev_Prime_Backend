@@ -28,6 +28,7 @@ const stationSchema = new mongoose.Schema({
   image: { type: String },
   amenities: [{ type: String }],
   openHours: { type: String, default: '24/7' },
+  waitingQueue: { type: Number, default: 0 },
   pricing: {
     acPrice: { type: Number, default: 18.00 },
     dcPrice: { type: Number, default: 24.00 },
