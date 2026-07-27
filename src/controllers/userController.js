@@ -158,12 +158,16 @@ const getUserProfile = async (req, res) => {
 // @access  Private (User)
 const getOwnProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
-    if (user) {
-      res.json(user);
-    } else {
-      res.status(404).json({ message: 'User not found' });
-    }
+    const user = await User.findById(req.user._id).lean();
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Attach KYC status dynamically
+    const KYC = require('../models/KYC');
+    const kyc = await KYC.findOne({ user: req.user._id }).select('status rejectionReason verifiedAt');
+    user.kycStatus = kyc?.status || 'not_submitted';
+    user.kycRejectionReason = kyc?.rejectionReason || null;
+
+    res.json(user);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
