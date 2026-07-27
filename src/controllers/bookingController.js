@@ -491,6 +491,48 @@ const stopChargingRemote = async (req, res) => {
   }
 };
 
+// @desc  Get live queue for a station
+// @route GET /api/booking/queue/:stationId
+// @access User
+const getStationQueue = async (req, res) => {
+  try {
+    const { stationId } = req.params;
+    
+    // Find Confirmed or Ongoing bookings for this station
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+    const activeBookings = await Booking.find({
+      station: stationId,
+      status: { $in: ['Confirmed', 'Ongoing'] },
+      scheduledDate: { $gte: today } // Ignore past unused confirmed bookings
+    });
+
+    let totalWaitMins = 0;
+    let waitingCars = 0;
+
+    activeBookings.forEach(b => {
+      waitingCars++;
+      totalWaitMins += (b.estimatedTime || 30); // fallback to 30 mins
+    });
+
+    // Assume parallel charging depends on connectors, but for simplicity, wait time is total / 1.5 approx
+    // If it's just a single queue, we just divide by average connectors (say 2)
+    const expectedWaitTimeMins = Math.max(0, Math.round(totalWaitMins / 2));
+    const nextAvailableTime = new Date(Date.now() + expectedWaitTimeMins * 60000);
+
+    res.json({
+      success: true,
+      data: {
+        waitingCars,
+        expectedWaitTimeMins,
+        nextAvailableTime: nextAvailableTime.toISOString()
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 module.exports = {
   createOrder,
   createBooking,
@@ -502,4 +544,5 @@ module.exports = {
   updateBookingStatusAdmin,
   startChargingRemote,
   stopChargingRemote,
+  getStationQueue,
 };

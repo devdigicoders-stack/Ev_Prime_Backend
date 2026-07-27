@@ -11,6 +11,7 @@ const {
   updateBookingStatusAdmin,
   startChargingRemote,
   stopChargingRemote,
+  getStationQueue,
 } = require('../controllers/bookingController');
 const { protect, protectUser, protectAdminOrUser } = require('../middlewares/authMiddleware');
 
@@ -28,6 +29,7 @@ router.put('/admin/:id/stop-charging', protect, stopChargingRemote);
 router.post('/create-order', protectUser, createOrder);
 router.post('/', protectUser, createBooking);
 router.get('/my', protectUser, getMyBookings);
+router.get('/queue/:stationId', protectUser, getStationQueue);
 router.put('/:id/cancel', protectUser, cancelBooking);
 router.put('/:id/reschedule', protectUser, rescheduleBooking);
 router.get('/:id', protectUser, getBookingById);
