@@ -3,6 +3,14 @@ const User = require('../models/User');
 const Station = require('../models/Station');
 const notificationService = require('../services/notificationService');
 
+// Helper: update tier based on points
+const updateTier = (points) => {
+  if (points >= 5000) return 'Platinum';
+  if (points >= 2000) return 'Gold';
+  if (points >= 500) return 'Silver';
+  return 'Bronze';
+};
+
 // @desc    Get all reviews (latest first)
 // @route   GET /api/reviews
 // @access  Public (or Private if you want)
@@ -46,6 +54,27 @@ const createReview = async (req, res) => {
     }
 
     const review = await Review.create(reviewData);
+
+    // ── Award 50 reward points for submitting a review ──
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      { $inc: { rewardPoints: 50 } },
+      { new: true }
+    );
+    if (updatedUser) {
+      const newTier = updateTier(updatedUser.rewardPoints);
+      if (newTier !== updatedUser.tier) {
+        await User.findByIdAndUpdate(req.user._id, { tier: newTier });
+      }
+      // Notify user about points
+      await notificationService.sendToUser(
+        req.user._id,
+        'You earned 50 Reward Points! 🎉',
+        'Thanks for your review! 50 points have been added to your account.',
+        { type: 'reward' },
+        'reward'
+      ).catch(() => {});
+    }
 
     const populatedReview = await Review.findById(review._id).populate('user', 'name profileImage');
 
