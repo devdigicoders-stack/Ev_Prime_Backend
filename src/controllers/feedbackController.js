@@ -1,5 +1,13 @@
 const Feedback = require('../models/Feedback');
+const User = require('../models/User');
 const notificationService = require('../services/notificationService');
+
+const updateTier = (points) => {
+  if (points >= 5000) return 'Platinum';
+  if (points >= 2000) return 'Gold';
+  if (points >= 500) return 'Silver';
+  return 'Bronze';
+};
 
 // Submit feedback
 const submitFeedback = async (req, res) => {
@@ -13,6 +21,31 @@ const submitFeedback = async (req, res) => {
       productId: productId || null,
       orderId: orderId || null,
     });
+
+    // ── Award 50 reward points for submitting feedback ──
+    try {
+      const updatedUser = await User.findByIdAndUpdate(
+        req.user._id,
+        { $inc: { rewardPoints: 50 } },
+        { new: true }
+      );
+      if (updatedUser) {
+        const newTier = updateTier(updatedUser.rewardPoints);
+        if (newTier !== updatedUser.tier) {
+          await User.findByIdAndUpdate(req.user._id, { tier: newTier });
+        }
+        // Notify user about points
+        await notificationService.sendToUser(
+          req.user._id,
+          'You earned 50 Reward Points! 🎉',
+          'Thanks for your feedback! 50 points have been added to your account.',
+          { type: 'reward' },
+          'reward'
+        ).catch(() => {});
+      }
+    } catch (e) {
+      console.error('Reward points error:', e.message);
+    }
 
     // Notify admins
     await notificationService.sendToAllAdmins(
