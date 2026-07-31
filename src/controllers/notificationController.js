@@ -97,11 +97,40 @@ const sendProximityAlert = async (req, res) => {
   }
 };
 
+// Send weak network booking reminder alert
+const sendWeakNetworkAlert = async (req, res) => {
+  try {
+    const { stationId, stationName, title, body, broadcast } = req.body;
+    const notifTitle = title || `⚠️ Weak Network Area Ahead!`;
+    const notifBody = body || `Network signal is weak ahead near ${stationName || 'upcoming station'}. Book your EV charging slot in advance now to avoid connectivity issues!`;
+
+    let result;
+    if (broadcast) {
+      result = await notificationService.sendToAllUsers(notifTitle, notifBody, { stationId: stationId || '', type: 'weak_network' }, 'alert');
+    } else {
+      result = await notificationService.sendToUser(
+        req.user._id,
+        notifTitle,
+        notifBody,
+        { stationId: stationId || '', type: 'weak_network' },
+        'alert'
+      );
+    }
+
+    res.json({ success: true, pushSent: result.pushSent, count: result.count });
+  } catch (error) {
+    console.error('Error sending weak network alert:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   updateFcmToken,
   getUserNotifications,
   markAsRead,
   testSendNotification,
-  sendProximityAlert
+  sendProximityAlert,
+  sendWeakNetworkAlert
 };
+
 
