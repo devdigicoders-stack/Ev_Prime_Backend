@@ -118,14 +118,36 @@ const searchStations = async (req, res) => {
 
     const filter = {};
 
-    if (q) {
-      filter.$or = [
-        { name: { $regex: q, $options: 'i' } },
-        { location: { $regex: q, $options: 'i' } },
-        { address: { $regex: q, $options: 'i' } },
-        { city: { $regex: q, $options: 'i' } },
-        { partner: { $regex: q, $options: 'i' } }
-      ];
+    if (q && q.trim()) {
+      const stopWords = new Set([
+        'me', 'mai', 'main', 'in', 'pe', 'par', 'ka', 'ki', 'ke', 'ko', 'se', 'hai', 'hain', 'ho',
+        'near', 'nearby', 'paas', 'pass', 'batao', 'bataiye', 'dikhao', 'dikhaye', 'show', 'find',
+        'search', 'kahan', 'kahahan', 'where', 'is', 'are', 'the', 'a', 'an', 'for', 'of', 'and', 'or',
+        'with', 'to', 'from', 'location', 'locations', 'area', 'city', 'place', 'bhai',
+        'charging', 'charginf', 'chargin', 'chargng',
+        'station', 'stations', 'stn', 'stasion',
+        'charger', 'chargers', 'charget',
+        'ev', 'evs', 'point', 'points', 'spot', 'spots', 'hub', 'hubs'
+      ]);
+
+      const rawWords = q.trim().split(/\s+/).filter(Boolean);
+      const sigWords = rawWords.filter(w => !stopWords.has(w.toLowerCase()));
+      const wordsToSearch = sigWords.length > 0 ? sigWords : rawWords;
+
+      filter.$and = wordsToSearch.map(word => {
+        const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return {
+          $or: [
+            { name: { $regex: escaped, $options: 'i' } },
+            { location: { $regex: escaped, $options: 'i' } },
+            { address: { $regex: escaped, $options: 'i' } },
+            { city: { $regex: escaped, $options: 'i' } },
+            { state: { $regex: escaped, $options: 'i' } },
+            { partner: { $regex: escaped, $options: 'i' } },
+            { chargeType: { $regex: escaped, $options: 'i' } }
+          ]
+        };
+      });
     }
 
     if (city) {

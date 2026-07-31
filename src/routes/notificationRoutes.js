@@ -12,6 +12,9 @@ router.get('/', protectUser, notificationController.getUserNotifications);
 // Mark notifications as read
 router.post('/mark-read', protectUser, notificationController.markAsRead);
 
+// Send route proximity alert
+router.post('/proximity-alert', protectUser, notificationController.sendProximityAlert);
+
 // Test route (Can be removed in production or protected with Admin auth)
 router.post('/test-send', protectUser, notificationController.testSendNotification);
 

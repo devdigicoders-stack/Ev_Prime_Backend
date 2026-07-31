@@ -70,9 +70,33 @@ const testSendNotification = async (req, res) => {
   }
 };
 
+// Send route proximity alert notification & persist to DB
+const sendProximityAlert = async (req, res) => {
+  try {
+    const { stationId, stationName, distanceKm, title, body } = req.body;
+    const notifTitle = title || `⚡ Charging Station Near You!`;
+    const notifBody = body || `${stationName || 'A charging station'} is ${distanceKm ? Number(distanceKm).toFixed(1) : ''} km away on your route!`;
+
+    const result = await notificationService.sendToUser(
+      req.user._id,
+      notifTitle,
+      notifBody,
+      { stationId: stationId || '', type: 'proximity_alert', distanceKm: distanceKm ? distanceKm.toString() : '' },
+      'alert'
+    );
+
+    res.json({ success: true, notification: result.notification });
+  } catch (error) {
+    console.error('Error sending proximity alert:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   updateFcmToken,
   getUserNotifications,
   markAsRead,
-  testSendNotification
+  testSendNotification,
+  sendProximityAlert
 };
+
