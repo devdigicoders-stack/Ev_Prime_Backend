@@ -1075,7 +1075,12 @@ const deletePricingTemplate = async (req, res) => {
 // Promotions/Offers
 const getMyPromotions = async (req, res) => {
   try {
-    const offers = await Offer.find({}).sort('-createdAt');
+    const offers = await Offer.find({
+      $or: [
+        { partner: req.partner._id },
+        { createdByPartner: req.partner._id }
+      ]
+    }).sort('-createdAt');
     res.json({ success: true, data: offers });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -1092,6 +1097,8 @@ const createPromotion = async (req, res) => {
     const discVal = discountValue ? Number(discountValue) : 20;
 
     const offer = await Offer.create({
+      partner: req.partner._id,
+      createdByPartner: req.partner._id,
       title,
       description,
       code: promoCode,
@@ -1099,7 +1106,6 @@ const createPromotion = async (req, res) => {
       discountValue: discVal,
       validUntil: validUntilDate,
       isActive: true,
-      createdByPartner: req.partner._id,
       partnerName: req.partner.name || req.partner.companyName
     });
 
@@ -1123,7 +1129,13 @@ const createPromotion = async (req, res) => {
 
 const deletePromotion = async (req, res) => {
   try {
-    const offer = await Offer.findByIdAndDelete(req.params.id);
+    const offer = await Offer.findOneAndDelete({
+      _id: req.params.id,
+      $or: [
+        { partner: req.partner._id },
+        { createdByPartner: req.partner._id }
+      ]
+    });
     if (!offer) {
       return res.status(404).json({ success: false, message: 'Promotion not found' });
     }
