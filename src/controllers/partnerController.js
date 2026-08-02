@@ -248,12 +248,20 @@ const partnerLogin = async (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) return res.status(400).json({ message: 'Username and password required' });
 
-    const partner = await Partner.findOne({ appUsername: username });
-    if (!partner || !partner.hasCredentials) return res.status(401).json({ message: 'Invalid credentials' });
+    const partner = await Partner.findOne({
+      $or: [
+        { appUsername: username },
+        { email: username.toLowerCase() },
+        { phone: username }
+      ]
+    });
+    if (!partner) return res.status(401).json({ message: 'Invalid credentials' });
     
-    if (partner.status === 'Pending') return res.status(403).json({ message: 'Your account is pending admin approval.' });
+    if (partner.status === 'Pending') return res.status(403).json({ message: 'Your account is under review. You can login after your account is verified by admin.' });
     if (partner.status === 'Rejected') return res.status(403).json({ message: 'Your account application was rejected.' });
     if (partner.status === 'Blocked') return res.status(403).json({ message: 'Your account has been blocked. Contact admin.' });
+
+    if (!partner.hasCredentials) return res.status(401).json({ message: 'Invalid credentials' });
 
     const isMatch = await partner.matchPassword(password);
     if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
