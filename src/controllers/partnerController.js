@@ -640,7 +640,6 @@ const getMyDashboard = async (req, res) => {
       .populate('station', 'name')
       .sort({ createdAt: -1 })
       .limit(5);
-    const unreadNotificationsCount = await PartnerNotification.countDocuments({ partner: req.partner._id, isRead: false });
 
     // 7-Day Revenue Graph points
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
