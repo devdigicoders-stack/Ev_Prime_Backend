@@ -455,10 +455,25 @@ const getMyRevenue = async (req, res) => {
     });
     const stationIds = stations.map(s => s._id);
 
-    let stationFilter = {};
-    if (stationIds.length > 0) {
-      stationFilter = { station: { $in: stationIds } };
+    if (stationIds.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          totalRevenue: 0,
+          acRevenue: 0,
+          dcRevenue: 0,
+          idleFees: 0,
+          prevRevenue: 0,
+          trendPercentage: '0.0',
+          isUp: true,
+          trendLabel: '-',
+          prevLabel: 'Previous',
+          revenueGraph: []
+        }
+      });
     }
+
+    const stationFilter = { station: { $in: stationIds } };
 
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -592,10 +607,27 @@ const getMyDashboard = async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    let stationFilter = {};
-    if (stationIds.length > 0) {
-      stationFilter = { station: { $in: stationIds } };
+    const unreadNotificationsCount = await PartnerNotification.countDocuments({ partner: req.partner._id, isRead: false });
+
+    if (stationIds.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          totalStations: 0,
+          activeStations: 0,
+          activeSessions: 0,
+          totalBookings: 0,
+          todayBookings: 0,
+          totalRevenue: 0,
+          todayRevenue: 0,
+          recentBookings: [],
+          unreadNotificationsCount,
+          revenueGraph: []
+        }
+      });
     }
+
+    const stationFilter = { station: { $in: stationIds } };
 
     const allBookings = await Booking.find(stationFilter);
     const todayBookings = allBookings.filter(b => new Date(b.createdAt) >= today);
