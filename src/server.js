@@ -86,6 +86,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const connectorRoutes = require('./routes/connectorRoutes');
 const legalRoutes = require('./routes/legalRoutes');
 const faqRoutes = require('./routes/faqRoutes');
+const enquiryRoutes = require('./routes/enquiryRoutes');
 
 app.use('/api/admin', adminRoutes);
 app.use('/api/user', userRoutes);
@@ -124,6 +125,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/connectors', connectorRoutes);
 app.use('/api/legal', legalRoutes);
 app.use('/api/faq', faqRoutes);
+app.use('/api/enquiries', enquiryRoutes);
 // Basic Route
 app.get('/', (req, res) => {
   res.send('API is running...');

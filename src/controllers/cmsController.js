@@ -102,9 +102,109 @@ const updateBanner = async (req, res) => {
   }
 };
 
+const ChargingSolution = require('../models/ChargingSolution');
+
+// @desc    Get all charging solutions
+// @route   GET /api/cms/solutions
+// @access  Public
+const getChargingSolutions = async (req, res) => {
+  try {
+    const solutions = await ChargingSolution.find().sort({ createdAt: -1 });
+    res.json(solutions);
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+// @desc    Add a charging solution
+// @route   POST /api/cms/solutions
+// @access  Admin
+const addChargingSolution = async (req, res) => {
+  try {
+    const { title, description, link, isActive } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'Solution image is required' });
+    }
+
+    const image = `/uploads/${req.file.filename}`;
+
+    const solution = new ChargingSolution({
+      title,
+      description,
+      image,
+      link: link || '/download-app',
+      isActive: isActive !== undefined ? isActive : true,
+    });
+
+    const createdSolution = await solution.save();
+    res.status(201).json(createdSolution);
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Update a charging solution
+// @route   PUT /api/cms/solutions/:id
+// @access  Admin
+const updateChargingSolution = async (req, res) => {
+  try {
+    const solution = await ChargingSolution.findById(req.params.id);
+
+    if (solution) {
+      solution.title = req.body.title || solution.title;
+      solution.description = req.body.description || solution.description;
+      solution.link = req.body.link !== undefined ? req.body.link : solution.link;
+      solution.isActive = req.body.isActive !== undefined ? req.body.isActive : solution.isActive;
+
+      if (req.file) {
+        const oldFilePath = path.join(__dirname, '../../', solution.image);
+        if (fs.existsSync(oldFilePath)) {
+          fs.unlinkSync(oldFilePath);
+        }
+        solution.image = `/uploads/${req.file.filename}`;
+      }
+
+      const updatedSolution = await solution.save();
+      res.json(updatedSolution);
+    } else {
+      res.status(404).json({ message: 'Solution not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Delete a charging solution
+// @route   DELETE /api/cms/solutions/:id
+// @access  Admin
+const deleteChargingSolution = async (req, res) => {
+  try {
+    const solution = await ChargingSolution.findById(req.params.id);
+
+    if (solution) {
+      const filePath = path.join(__dirname, '../../', solution.image);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+
+      await solution.deleteOne();
+      res.json({ message: 'Solution removed' });
+    } else {
+      res.status(404).json({ message: 'Solution not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
 module.exports = {
   getBanners,
   addBanner,
   updateBanner,
   deleteBanner,
+  getChargingSolutions,
+  addChargingSolution,
+  updateChargingSolution,
+  deleteChargingSolution
 };
