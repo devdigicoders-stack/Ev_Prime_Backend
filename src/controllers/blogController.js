@@ -5,9 +5,10 @@ const Blog = require('../models/Blog');
 // @access Public
 const getPublishedBlogs = async (req, res) => {
   try {
-    const { category, limit = 20, page = 1 } = req.query;
+    const { category, limit = 20, page = 1, search } = req.query;
     const query = { isPublished: true };
-    if (category && category !== 'All') query.category = category;
+    if (category && category !== 'All' && category !== 'All Posts') query.category = category;
+    if (search) query.title = { $regex: search, $options: 'i' };
 
     const skip = (Number(page) - 1) * Number(limit);
     const blogs = await Blog.find(query)
