@@ -35,7 +35,29 @@ const app = express();
 app.use(express.json());
 app.use(cors({
   origin: function(origin, callback) {
-    callback(null, true);
+    const allowedOrigins = [
+      // Local Development
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:5175',
+      'http://localhost:5176',
+      'http://localhost:3000',
+      // Admin Panel (local)
+      'http://localhost:5177',
+      // Production - Website
+      'https://ev-prime-website.vercel.app',
+      // Production - Admin Panel (add when deployed)
+      // 'https://ev-prime-admin.vercel.app',
+    ];
+
+    // Allow requests with no origin (mobile apps, Postman, server-to-server)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS policy: Origin '${origin}' not allowed`));
+    }
   },
   credentials: true,
 }));
