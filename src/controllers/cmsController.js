@@ -1,4 +1,5 @@
 const Banner = require('../models/Banner');
+const TeamMember = require('../models/TeamMember');
 const fs = require('fs');
 const path = require('path');
 
@@ -198,6 +199,105 @@ const deleteChargingSolution = async (req, res) => {
   }
 };
 
+// --- TEAM MEMBERS ---
+
+// @desc    Get all team members
+// @route   GET /api/cms/team
+// @access  Public
+const getTeamMembers = async (req, res) => {
+  try {
+    const team = await TeamMember.find().sort({ order: 1, createdAt: 1 });
+    res.json(team);
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Add a team member
+// @route   POST /api/cms/team
+// @access  Admin
+const addTeamMember = async (req, res) => {
+  try {
+    const { name, role, linkedin, twitter, email, order } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'Team member image is required' });
+    }
+
+    const image = `/uploads/${req.file.filename}`;
+
+    const member = new TeamMember({
+      name,
+      role,
+      image,
+      socials: { linkedin, twitter, email },
+      order: order ? parseInt(order) : 0
+    });
+
+    const createdMember = await member.save();
+    res.status(201).json(createdMember);
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Update a team member
+// @route   PUT /api/cms/team/:id
+// @access  Admin
+const updateTeamMember = async (req, res) => {
+  try {
+    const member = await TeamMember.findById(req.params.id);
+
+    if (member) {
+      member.name = req.body.name || member.name;
+      member.role = req.body.role || member.role;
+      member.order = req.body.order !== undefined ? parseInt(req.body.order) : member.order;
+      
+      if (req.body.linkedin !== undefined) member.socials.linkedin = req.body.linkedin;
+      if (req.body.twitter !== undefined) member.socials.twitter = req.body.twitter;
+      if (req.body.email !== undefined) member.socials.email = req.body.email;
+
+      if (req.file) {
+        const oldFilePath = path.join(__dirname, '../../', member.image);
+        if (fs.existsSync(oldFilePath)) {
+          fs.unlinkSync(oldFilePath);
+        }
+        member.image = `/uploads/${req.file.filename}`;
+      }
+
+      const updatedMember = await member.save();
+      res.json(updatedMember);
+    } else {
+      res.status(404).json({ message: 'Team member not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Delete a team member
+// @route   DELETE /api/cms/team/:id
+// @access  Admin
+const deleteTeamMember = async (req, res) => {
+  try {
+    const member = await TeamMember.findById(req.params.id);
+
+    if (member) {
+      const filePath = path.join(__dirname, '../../', member.image);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+
+      await member.deleteOne();
+      res.json({ message: 'Team member removed' });
+    } else {
+      res.status(404).json({ message: 'Team member not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
 module.exports = {
   getBanners,
   addBanner,
@@ -206,5 +306,9 @@ module.exports = {
   getChargingSolutions,
   addChargingSolution,
   updateChargingSolution,
-  deleteChargingSolution
+  deleteChargingSolution,
+  getTeamMembers,
+  addTeamMember,
+  updateTeamMember,
+  deleteTeamMember
 };

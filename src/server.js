@@ -89,6 +89,7 @@ const faqRoutes = require('./routes/faqRoutes');
 const enquiryRoutes = require('./routes/enquiryRoutes');
 const blogRoutes = require('./routes/blogRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
+const newsletterRoutes = require('./routes/newsletterRoutes');
 
 app.use('/api/admin', adminRoutes);
 app.use('/api/user', userRoutes);
@@ -130,6 +131,8 @@ app.use('/api/faq', faqRoutes);
 app.use('/api/enquiries', enquiryRoutes);
 app.use('/api/blogs', blogRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/newsletter', newsletterRoutes);
+
 // Basic Route
 app.get('/', (req, res) => {
   res.send('API is running...');

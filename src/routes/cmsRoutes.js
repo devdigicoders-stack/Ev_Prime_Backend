@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { 
   getBanners, addBanner, updateBanner, deleteBanner,
-  getChargingSolutions, addChargingSolution, updateChargingSolution, deleteChargingSolution
+  getChargingSolutions, addChargingSolution, updateChargingSolution, deleteChargingSolution,
+  getTeamMembers, addTeamMember, updateTeamMember, deleteTeamMember
 } = require('../controllers/cmsController');
 const { protect } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
@@ -23,5 +24,14 @@ router.route('/solutions')
 router.route('/solutions/:id')
   .put(protect, upload.single('solutionImage'), updateChargingSolution)
   .delete(protect, deleteChargingSolution);
+
+// Team Members Routes
+router.route('/team')
+  .get(getTeamMembers)
+  .post(protect, upload.single('teamImage'), addTeamMember);
+
+router.route('/team/:id')
+  .put(protect, upload.single('teamImage'), updateTeamMember)
+  .delete(protect, deleteTeamMember);
 
 module.exports = router;
