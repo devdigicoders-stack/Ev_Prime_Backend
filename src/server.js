@@ -47,7 +47,7 @@ app.use(cors({
       // Production - Website
       'https://ev-prime-website.vercel.app',
       // Production - Admin Panel (add when deployed)
-      // 'https://ev-prime-admin.vercel.app',
+      'https://ev-prime-admin-panel.vercel.app',
     ];
 
     // Allow requests with no origin (mobile apps, Postman, server-to-server)
