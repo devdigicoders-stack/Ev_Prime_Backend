@@ -103,7 +103,11 @@ const getPublicSettings = async (req, res) => {
         instagramUrl: settings.instagramUrl || 'https://instagram.com',
         linkedinUrl: settings.linkedinUrl || 'https://linkedin.com',
         youtubeUrl: settings.youtubeUrl || 'https://youtube.com',
-        twitterUrl: settings.twitterUrl || 'https://twitter.com'
+        twitterUrl: settings.twitterUrl || 'https://twitter.com',
+        tawkEnabled: settings.tawkEnabled !== undefined ? settings.tawkEnabled : true,
+        tawkPropertyId: settings.tawkPropertyId || '',
+        tawkWidgetId: settings.tawkWidgetId || 'default',
+        tawkDirectChatUrl: settings.tawkDirectChatUrl || ''
       }
     });
   } catch (error) {

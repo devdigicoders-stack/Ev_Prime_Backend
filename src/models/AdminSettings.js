@@ -39,6 +39,12 @@ const adminSettingsSchema = new mongoose.Schema(
     linkedinUrl: { type: String, default: 'https://linkedin.com' },
     youtubeUrl: { type: String, default: 'https://youtube.com' },
     twitterUrl: { type: String, default: 'https://twitter.com' },
+
+    // Tawk.to Live Chat Settings
+    tawkEnabled: { type: Boolean, default: true },
+    tawkPropertyId: { type: String, default: '' },
+    tawkWidgetId: { type: String, default: 'default' },
+    tawkDirectChatUrl: { type: String, default: '' },
   },
   { timestamps: true }
 );
