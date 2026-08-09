@@ -78,9 +78,43 @@ const generateApiKey = async (req, res) => {
   }
 };
 
+const getPublicSettings = async (req, res) => {
+  try {
+    let settings = await AdminSettings.findOne();
+    if (!settings) {
+      settings = {
+        phone: '+91 98765 43210',
+        contactEmail: 'hello@bharatevprime.com',
+        address: 'New Delhi, India',
+        facebookUrl: 'https://facebook.com',
+        instagramUrl: 'https://instagram.com',
+        linkedinUrl: 'https://linkedin.com',
+        youtubeUrl: 'https://youtube.com',
+        twitterUrl: 'https://twitter.com'
+      };
+    }
+    res.json({
+      success: true,
+      data: {
+        phone: settings.phone || '+91 98765 43210',
+        contactEmail: settings.contactEmail || 'hello@bharatevprime.com',
+        address: settings.address || 'New Delhi, India',
+        facebookUrl: settings.facebookUrl || 'https://facebook.com',
+        instagramUrl: settings.instagramUrl || 'https://instagram.com',
+        linkedinUrl: settings.linkedinUrl || 'https://linkedin.com',
+        youtubeUrl: settings.youtubeUrl || 'https://youtube.com',
+        twitterUrl: settings.twitterUrl || 'https://twitter.com'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   getSettings,
   updateSettings,
   updateBilling,
-  generateApiKey
+  generateApiKey,
+  getPublicSettings
 };

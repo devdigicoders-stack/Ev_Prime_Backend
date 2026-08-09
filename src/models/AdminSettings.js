@@ -29,6 +29,16 @@ const adminSettingsSchema = new mongoose.Schema(
     stripeEnabled: { type: Boolean, default: true },
     awsEnabled: { type: Boolean, default: true },
     zendeskEnabled: { type: Boolean, default: false },
+
+    // Contact & Social Media Info
+    phone: { type: String, default: '+91 98765 43210' },
+    contactEmail: { type: String, default: 'hello@bharatevprime.com' },
+    address: { type: String, default: 'New Delhi, India' },
+    facebookUrl: { type: String, default: 'https://facebook.com' },
+    instagramUrl: { type: String, default: 'https://instagram.com' },
+    linkedinUrl: { type: String, default: 'https://linkedin.com' },
+    youtubeUrl: { type: String, default: 'https://youtube.com' },
+    twitterUrl: { type: String, default: 'https://twitter.com' },
   },
   { timestamps: true }
 );

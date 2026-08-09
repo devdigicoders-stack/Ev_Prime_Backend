@@ -4,10 +4,12 @@ const {
   getSettings,
   updateSettings,
   updateBilling,
-  generateApiKey
+  generateApiKey,
+  getPublicSettings
 } = require('../controllers/settingsController');
 const { protect } = require('../middlewares/authMiddleware');
 
+router.get('/public', getPublicSettings);
 router.get('/', protect, getSettings);
 router.put('/', protect, updateSettings);
 router.put('/billing', protect, updateBilling);
