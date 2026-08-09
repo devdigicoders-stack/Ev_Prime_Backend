@@ -42,9 +42,9 @@ const adminSettingsSchema = new mongoose.Schema(
 
     // Tawk.to Live Chat Settings
     tawkEnabled: { type: Boolean, default: true },
-    tawkPropertyId: { type: String, default: '' },
-    tawkWidgetId: { type: String, default: 'default' },
-    tawkDirectChatUrl: { type: String, default: '' },
+    tawkPropertyId: { type: String, default: '6a787fd78775771d44219111' },
+    tawkWidgetId: { type: String, default: '1jvjb6ouh' },
+    tawkDirectChatUrl: { type: String, default: 'https://embed.tawk.to/6a787fd78775771d44219111/1jvjb6ouh' },
   },
   { timestamps: true }
 );

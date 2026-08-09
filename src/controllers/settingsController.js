@@ -105,9 +105,9 @@ const getPublicSettings = async (req, res) => {
         youtubeUrl: settings.youtubeUrl || 'https://youtube.com',
         twitterUrl: settings.twitterUrl || 'https://twitter.com',
         tawkEnabled: settings.tawkEnabled !== undefined ? settings.tawkEnabled : true,
-        tawkPropertyId: settings.tawkPropertyId || '',
-        tawkWidgetId: settings.tawkWidgetId || 'default',
-        tawkDirectChatUrl: settings.tawkDirectChatUrl || ''
+        tawkPropertyId: settings.tawkPropertyId || '6a787fd78775771d44219111',
+        tawkWidgetId: settings.tawkWidgetId || '1jvjb6ouh',
+        tawkDirectChatUrl: settings.tawkDirectChatUrl || 'https://embed.tawk.to/6a787fd78775771d44219111/1jvjb6ouh'
       }
     });
   } catch (error) {
