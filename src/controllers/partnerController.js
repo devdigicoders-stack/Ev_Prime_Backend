@@ -491,6 +491,16 @@ const getMyRevenue = async (req, res) => {
       previousPeriodFilter = { $gte: yesterday, $lt: today };
       trendLabel = 'vs yesterday';
       prevLabel = 'Yesterday';
+    } else if (period === 'Yesterday') {
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const dayBefore = new Date(yesterday);
+      dayBefore.setDate(dayBefore.getDate() - 1);
+      
+      currentPeriodFilter = { $gte: yesterday, $lt: today };
+      previousPeriodFilter = { $gte: dayBefore, $lt: yesterday };
+      trendLabel = 'vs day before';
+      prevLabel = 'Day Before';
     } else if (period === 'This Week') {
       const startOfWeek = new Date(today);
       startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
