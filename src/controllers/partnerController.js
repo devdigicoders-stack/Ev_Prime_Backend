@@ -942,14 +942,21 @@ const getMyStaff = async (req, res) => {
 
 const addMyStaff = async (req, res) => {
   try {
+    if (!req.body) req.body = {};
     const partner = await Partner.findById(req.partner.id);
     if (!partner.staff) partner.staff = [];
     partner.staff.forEach(s => {
       if (s.role === 'Operator' || s.role === 'Viewer') s.role = 'Employee';
     });
+    
+    if (!req.body.name || !req.body.email) {
+       return res.status(400).json({ success: false, message: 'Name and email are required' });
+    }
+
     partner.staff.push({
       name: req.body.name,
       email: req.body.email,
+      profilePic: req.file ? `/uploads/${req.file.filename}` : null,
       role: req.body.role || 'Employee'
     });
     await partner.save();
