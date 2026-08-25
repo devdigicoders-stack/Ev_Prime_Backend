@@ -615,15 +615,21 @@ const getMyDashboard = async (req, res) => {
         data: {
           totalStations: 0,
           activeStations: 0,
+          onlineStations: 0,
+          busyStations: 0,
+          offlineStations: 0,
+          maintenanceStations: 0,
           activeSessions: 0,
           activeSessionDetails: [],
           totalBookings: 0,
           todayBookings: 0,
           totalRevenue: 0,
           todayRevenue: 0,
+          yesterdayRevenue: 0,
           recentBookings: [],
-          unreadNotificationsCount,
-          revenueGraph: []
+          unreadNotificationsCount: unreadNotificationsCount,
+          revenueGraph: [],
+          todayRevenueGraph: []
         }
       });
     }
@@ -633,10 +639,45 @@ const getMyDashboard = async (req, res) => {
     const allBookings = await Booking.find(stationFilter);
     const todayBookings = allBookings.filter(b => new Date(b.createdAt) >= today);
     const todayRevenue = todayBookings.reduce((sum, b) => sum + Number(b.estimatedCost || b.totalAmount || b.amount || 0), 0);
+    
+    // Yesterday's Revenue
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayBookings = allBookings.filter(b => {
+      const d = new Date(b.createdAt);
+      return d >= yesterday && d < today;
+    });
+    const yesterdayRevenue = yesterdayBookings.reduce((sum, b) => sum + Number(b.estimatedCost || b.totalAmount || b.amount || 0), 0);
+    
     const totalRevenue = allBookings.reduce((sum, b) => sum + Number(b.estimatedCost || b.totalAmount || b.amount || 0), 0);
-    const activeStations = stations.filter(s => s.status === 'Active').length;
+    
+    // Active Sessions
     const activeSessionsList = allBookings.filter(b => ['Confirmed', 'Ongoing', 'Charging'].includes(b.status));
     const activeSessions = activeSessionsList.length;
+
+    // Station Breakdown
+    let activeStations = 0;
+    let onlineStations = 0;
+    let offlineStations = 0;
+    let maintenanceStations = 0;
+    let busyStations = 0;
+
+    stations.forEach(s => {
+      if (s.status === 'Active') {
+        activeStations++;
+        // Check if any active session belongs to this station
+        const isBusy = activeSessionsList.some(b => b.station?.toString() === s._id.toString());
+        if (isBusy) {
+          busyStations++;
+        } else {
+          onlineStations++;
+        }
+      } else if (s.status === 'Offline') {
+        offlineStations++;
+      } else if (s.status === 'Maintenance') {
+        maintenanceStations++;
+      }
+    });
 
     const activeSessionDetails = activeSessionsList.map(b => {
       const station = stations.find(s => s._id.toString() === b.station?.toString());
@@ -691,20 +732,59 @@ const getMyDashboard = async (req, res) => {
       });
     }
 
+    // Today's Hourly Graph points (12 AM, 6 AM, 12 PM, 6 PM, Now)
+    const todayRevenueGraph = [];
+    const timeBlocks = [
+      { label: '12 AM', start: 0, end: 6 },
+      { label: '6 AM', start: 6, end: 12 },
+      { label: '12 PM', start: 12, end: 18 },
+      { label: '6 PM', start: 18, end: 24 }
+    ];
+
+    let cumulativeRevenue = 0;
+    const currentHour = new Date().getHours();
+
+    for (let block of timeBlocks) {
+      if (currentHour >= block.start) {
+        const blockBookings = todayBookings.filter(b => {
+          const h = new Date(b.createdAt).getHours();
+          return h >= block.start && h < block.end;
+        });
+        const blockRev = blockBookings.reduce((sum, b) => sum + Number(b.estimatedCost || b.totalAmount || b.amount || 0), 0);
+        cumulativeRevenue += blockRev;
+        todayRevenueGraph.push({
+          time: block.label,
+          revenue: Math.round(cumulativeRevenue * 100) / 100
+        });
+      }
+    }
+    
+    // Add "Now" point
+    todayRevenueGraph.push({
+      time: 'Now',
+      revenue: Math.round(todayRevenue * 100) / 100
+    });
+
     res.json({
       success: true,
       data: {
         totalStations: stations.length,
         activeStations,
+        onlineStations,
+        busyStations,
+        offlineStations,
+        maintenanceStations,
         activeSessions,
         activeSessionDetails,
         totalBookings: allBookings.length,
         todayBookings: todayBookings.length,
         totalRevenue: Math.round(totalRevenue * 100) / 100,
         todayRevenue: Math.round(todayRevenue * 100) / 100,
+        yesterdayRevenue: Math.round(yesterdayRevenue * 100) / 100,
         recentBookings,
         unreadNotificationsCount,
-        revenueGraph
+        revenueGraph,
+        todayRevenueGraph
       }
     });
   } catch (error) {
