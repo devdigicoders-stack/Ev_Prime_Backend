@@ -616,6 +616,7 @@ const getMyDashboard = async (req, res) => {
           totalStations: 0,
           activeStations: 0,
           activeSessions: 0,
+          activeSessionDetails: [],
           totalBookings: 0,
           todayBookings: 0,
           totalRevenue: 0,
@@ -634,7 +635,34 @@ const getMyDashboard = async (req, res) => {
     const todayRevenue = todayBookings.reduce((sum, b) => sum + Number(b.estimatedCost || b.totalAmount || b.amount || 0), 0);
     const totalRevenue = allBookings.reduce((sum, b) => sum + Number(b.estimatedCost || b.totalAmount || b.amount || 0), 0);
     const activeStations = stations.filter(s => s.status === 'Active').length;
-    const activeSessions = allBookings.filter(b => b.status === 'Confirmed' || b.status === 'Ongoing').length;
+    const activeSessionsList = allBookings.filter(b => ['Confirmed', 'Ongoing', 'Charging'].includes(b.status));
+    const activeSessions = activeSessionsList.length;
+
+    const activeSessionDetails = activeSessionsList.map(b => {
+      const station = stations.find(s => s._id.toString() === b.station?.toString());
+      const stName = station?.name || 'Unknown Station';
+      const cost = Number(b.estimatedCost || b.amount || b.totalAmount || 0);
+      
+      const startTime = b.chargingStartTime || b.createdAt || new Date();
+      const elapsedMinutes = Math.max(0, Math.floor((new Date() - new Date(startTime)) / 60000));
+      
+      let percentage = 0;
+      if (b.duration && b.duration > 0) {
+         percentage = Math.min(100, Math.floor((elapsedMinutes / b.duration) * 100));
+      } else {
+         percentage = Math.min(99, elapsedMinutes * 2);
+      }
+
+      return {
+        id: b._id,
+        stationName: stName,
+        percentage,
+        cost,
+        timeElapsed: elapsedMinutes,
+        status: b.status
+      };
+    });
+
     const recentBookings = await Booking.find(stationFilter)
       .populate('user', 'name')
       .populate('station', 'name')
@@ -669,6 +697,7 @@ const getMyDashboard = async (req, res) => {
         totalStations: stations.length,
         activeStations,
         activeSessions,
+        activeSessionDetails,
         totalBookings: allBookings.length,
         todayBookings: todayBookings.length,
         totalRevenue: Math.round(totalRevenue * 100) / 100,
