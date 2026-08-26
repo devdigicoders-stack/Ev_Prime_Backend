@@ -720,6 +720,64 @@ const getMyDashboard = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(5);
 
+    const recentPayouts = await PartnerPayout.find({ partner: req.partner._id })
+      .sort({ createdAt: -1 })
+      .limit(3);
+
+    let recentActivity = [];
+
+    recentBookings.forEach(b => {
+      const stName = b.station?.name || 'Unknown';
+      const statusText = b.status === 'Completed' ? 'completed' : b.status === 'Cancelled' ? 'cancelled' : 'received';
+      recentActivity.push({
+        type: 'Session',
+        title: `Session ${statusText}`,
+        subtitle: `${stName}`,
+        amount: b.estimatedCost || b.totalAmount || b.amount || 0,
+        date: b.createdAt,
+        timestamp: new Date(b.createdAt).getTime()
+      });
+    });
+
+    recentPayouts.forEach(p => {
+      recentActivity.push({
+        type: 'Payout',
+        title: `Payout ${p.status.toLowerCase()}`,
+        subtitle: 'Processed to bank account',
+        amount: p.amount,
+        date: p.createdAt,
+        timestamp: new Date(p.createdAt).getTime()
+      });
+    });
+
+    stations.forEach(s => {
+      if (s.status === 'Offline') {
+        const updatedAt = s.updatedAt || new Date();
+        const elapsedMin = Math.floor((new Date() - new Date(updatedAt)) / 60000);
+        recentActivity.push({
+          type: 'Offline',
+          title: 'Station Offline',
+          subtitle: `${s.name || 'Station'} (Offline for ${elapsedMin} min)`,
+          amount: 0,
+          date: updatedAt,
+          timestamp: new Date(updatedAt).getTime()
+        });
+      } else if (s.status === 'Maintenance') {
+         const updatedAt = s.updatedAt || new Date();
+         recentActivity.push({
+          type: 'Maintenance',
+          title: 'Maintenance',
+          subtitle: `${s.name || 'Station'} is under maintenance`,
+          amount: 0,
+          date: updatedAt,
+          timestamp: new Date(updatedAt).getTime()
+        });
+      }
+    });
+
+    recentActivity.sort((a, b) => b.timestamp - a.timestamp);
+    recentActivity = recentActivity.slice(0, 6);
+
     // 7-Day Revenue Graph points
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const revenueGraph = [];
@@ -791,7 +849,7 @@ const getMyDashboard = async (req, res) => {
         totalRevenue: Math.round(totalRevenue * 100) / 100,
         todayRevenue: Math.round(todayRevenue * 100) / 100,
         yesterdayRevenue: Math.round(yesterdayRevenue * 100) / 100,
-        recentBookings,
+        recentActivity,
         unreadNotificationsCount,
         revenueGraph,
         todayRevenueGraph
@@ -1326,20 +1384,104 @@ const updateFcmToken = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
 // @desc    Get partner notifications
 // @route   GET /api/partner/me/notifications
 // @access  Partner
 const getMyNotifications = async (req, res) => {
-  try {
-    const notifications = await PartnerNotification.find({ partner: req.partner._id })
-      .sort({ createdAt: -1 })
-      .limit(50);
-    res.json({ success: true, data: notifications });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+    try {
+      const dbNotifications = await PartnerNotification.find({ partner: req.partner._id })
+        .sort({ createdAt: -1 })
+        .limit(30)
+        .lean();
+      
+      let intelligentNotifications = [];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const stations = await Station.find({
+        $or: [
+          { partner: req.partner.name },
+          { partnerId: req.partner._id },
+          { partner: req.partner._id.toString() },
+          { partner: req.partner.companyName }
+        ]
+      });
+
+      if (stations.length > 0) {
+        const stationIds = stations.map(s => s._id);
+        const todayBookings = await Booking.find({ station: { $in: stationIds }, createdAt: { $gte: today } });
+
+        stations.forEach(s => {
+          // Offline check
+          if (s.status === 'Offline') {
+            const updatedAt = s.updatedAt || new Date();
+            const elapsedMin = Math.floor((new Date() - new Date(updatedAt)) / 60000);
+            intelligentNotifications.push({
+              _id: 'dyn_off_' + s._id,
+              title: 'Station Offline',
+              message: `Station ${s.name || 'Unknown'} has been offline for ${elapsedMin} minutes.`,
+              type: 'alert',
+              category: 'Offline',
+              isRead: false,
+              createdAt: updatedAt
+            });
+          }
+
+          // Maintenance check
+          if (s.status === 'Maintenance' || s.nextMaintenanceDate && new Date(s.nextMaintenanceDate) <= new Date(Date.now() + 86400000)) {
+            intelligentNotifications.push({
+              _id: 'dyn_maint_' + s._id,
+              title: 'Maintenance Reminder',
+              message: `Station ${s.name || 'Unknown'} maintenance is due or currently under maintenance.`,
+              type: 'warning',
+              category: 'Maintenance',
+              isRead: false,
+              createdAt: new Date()
+            });
+          }
+
+          // Low utilization check
+          const stBookingsCount = todayBookings.filter(b => b.station?.toString() === s._id.toString()).length;
+          if (s.status === 'Active' && stBookingsCount < 3 && new Date().getHours() > 14) { // Only alert in afternoon/evening
+            intelligentNotifications.push({
+              _id: 'dyn_util_' + s._id,
+              title: 'Low Utilization',
+              message: `Station ${s.name || 'Unknown'} has received only ${stBookingsCount} sessions today.`,
+              type: 'info',
+              category: 'Utilization',
+              isRead: false,
+              createdAt: new Date()
+            });
+          }
+        });
+
+        // Payout check
+        const recentPayout = await PartnerPayout.findOne({ partner: req.partner._id, status: 'Processed' }).sort({ createdAt: -1 });
+        if (recentPayout) {
+           const payoutAgeDays = Math.floor((new Date() - new Date(recentPayout.updatedAt || recentPayout.createdAt)) / 86400000);
+           if (payoutAgeDays < 3) { // Show if processed in last 3 days
+              intelligentNotifications.push({
+                _id: 'dyn_pay_' + recentPayout._id,
+                title: 'Payout Processed',
+                message: `₹${recentPayout.amount} transferred to your bank account.`,
+                type: 'success',
+                category: 'Payout',
+                isRead: false,
+                createdAt: recentPayout.updatedAt || recentPayout.createdAt
+              });
+           }
+        }
+      }
+
+      // Combine and sort
+      let allNotifications = [...intelligentNotifications, ...dbNotifications];
+      allNotifications.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+      res.json({ success: true, data: allNotifications });
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  };
 
 // @desc    Mark partner notifications as read
 // @route   PUT /api/partner/me/notifications/read
