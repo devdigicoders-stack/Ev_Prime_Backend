@@ -9,16 +9,18 @@ async function testNotifications() {
     console.log('Connecting to MongoDB...');
     await mongoose.connect(process.env.MONGO_URI);
     
-    // Find the first partner in the database
-    const partner = await Partner.findOne();
-    
-    if (!partner) {
-      console.log('No partners found in the database. Cannot send test notifications.');
-      process.exit(1);
-    }
+    const User = require('./src/models/User');
+    const Admin = require('./src/models/Admin');
+    const Franchise = require('./src/models/Franchise');
 
-    const partnerId = partner._id.toString();
-    console.log(`Sending notifications to Partner: ${partner.name || partner.phone} (${partnerId})`);
+    const users = await User.find({ email: 'sv575014@gmail.com' });
+    const admins = await Admin.find({ email: 'sv575014@gmail.com' });
+    const franchises = await Franchise.find({ email: 'sv575014@gmail.com' });
+
+    console.log(`Found in Users: ${users.length}`);
+    console.log(`Found in Admins: ${admins.length}`);
+    console.log(`Found in Franchises: ${franchises.length}`);
+    process.exit(0);
 
     // 1. Station Offline
     await notificationService.sendToPartner(

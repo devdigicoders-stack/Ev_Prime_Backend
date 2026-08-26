@@ -4,16 +4,12 @@ const Booking = require('../models/Booking');
 const notificationService = require('../services/notificationService');
 
 const initCronJobs = () => {
-  // 1. Station Offline Check (Runs every 10 minutes)
-  //   Looks for stations that have been offline for at least 15 mins.
-  //   Since timestamps:true updates 'updatedAt' on any change,
-  //   if it's offline and updatedAt < 15 mins ago, we send an alert.
-  cron.schedule('*/10 * * * *', async () => {
+  // 1. Station Offline Check (TEMPORARY: Runs every minute, NO DELAY FOR TESTING)
+  cron.schedule('* * * * *', async () => {
     try {
-      const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
+      // Find stations that are offline and notification hasn't been sent
       const offlineStations = await Station.find({
         status: 'Offline',
-        updatedAt: { $lte: fifteenMinsAgo },
         offlineNotificationSent: { $ne: true }
       });
 
@@ -22,12 +18,16 @@ const initCronJobs = () => {
         const diffMs = Date.now() - new Date(station.updatedAt).getTime();
         const mins = Math.floor(diffMs / 60000);
 
-        await notificationService.sendToPartner(
-          station.partner.toString(),
-          'Station Offline 🔴',
-          `Station ${station.name} has been offline for ${mins} minutes.`,
-          'alert'
-        );
+        // Fetch partner by name to get their ID
+        const partnerDoc = await require('../models/Partner').findOne({ name: station.partner });
+        if (partnerDoc) {
+          await notificationService.sendToPartner(
+            partnerDoc._id.toString(),
+            'Station Offline 🔴',
+            `Station ${station.name} has been offline for ${mins} minutes.`,
+            'alert'
+          );
+        }
 
         station.offlineNotificationSent = true;
         await station.save();
@@ -37,8 +37,8 @@ const initCronJobs = () => {
     }
   });
 
-  // 1b. Reset Offline Flag (Runs every 15 minutes)
-  cron.schedule('*/15 * * * *', async () => {
+  // 1b. Reset Offline Flag (TEMPORARY: Runs every minute for testing)
+  cron.schedule('* * * * *', async () => {
     try {
       await Station.updateMany(
         { status: { $ne: 'Offline' }, offlineNotificationSent: true },
@@ -67,12 +67,15 @@ const initCronJobs = () => {
         });
 
         if (sessionCount <= 2) {
-          await notificationService.sendToPartner(
-            station.partner.toString(),
-            'Low Utilization ⚠️',
-            `Station ${station.name} has received only ${sessionCount} sessions today.`,
-            'warning'
-          );
+          const partnerDoc = await require('../models/Partner').findOne({ name: station.partner });
+          if (partnerDoc) {
+            await notificationService.sendToPartner(
+              partnerDoc._id.toString(),
+              'Low Utilization ⚠️',
+              `Station ${station.name} has received only ${sessionCount} sessions today.`,
+              'warning'
+            );
+          }
         }
       }
     } catch (err) {
@@ -95,12 +98,15 @@ const initCronJobs = () => {
       });
 
       for (const station of stationsDue) {
-        await notificationService.sendToPartner(
-          station.partner.toString(),
-          'Maintenance Reminder 🔧',
-          `Station ${station.name} maintenance is due tomorrow.`,
-          'warning'
-        );
+        const partnerDoc = await require('../models/Partner').findOne({ name: station.partner });
+        if (partnerDoc) {
+          await notificationService.sendToPartner(
+            partnerDoc._id.toString(),
+            'Maintenance Reminder 🔧',
+            `Station ${station.name} maintenance is due tomorrow.`,
+            'warning'
+          );
+        }
       }
     } catch (err) {
       console.error('Error in Maintenance Reminder Cron Job:', err);
