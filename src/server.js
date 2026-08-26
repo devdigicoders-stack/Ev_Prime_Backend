@@ -9,6 +9,8 @@ const connectDB = require('./config/db');
 
 // Connect to database
 const mongoose = require('mongoose');
+const initCronJobs = require('./cron/notificationJobs');
+
 connectDB().then(async () => {
   // Auto-seed ConnectorMaster if empty
   try {
@@ -24,9 +26,12 @@ connectDB().then(async () => {
       ]);
       console.log('Auto-seeded 5 default connector types.');
     }
-  } catch (e) {
-    console.error('Auto-seed connectors failed:', e.message);
-  }
+    } catch (e) {
+      console.error('Auto-seed connectors failed:', e.message);
+    }
+
+    // Initialize Cron Jobs
+    initCronJobs();
 });
 
 const app = express();
