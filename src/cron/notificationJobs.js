@@ -22,7 +22,7 @@ const initCronJobs = () => {
         const diffMs = Date.now() - new Date(station.updatedAt).getTime();
         const mins = Math.floor(diffMs / 60000);
 
-        await notificationService.sendPartnerNotification(
+        await notificationService.sendToPartner(
           station.partner.toString(),
           'Station Offline 🔴',
           `Station ${station.name} has been offline for ${mins} minutes.`,
@@ -67,7 +67,7 @@ const initCronJobs = () => {
         });
 
         if (sessionCount <= 2) {
-          await notificationService.sendPartnerNotification(
+          await notificationService.sendToPartner(
             station.partner.toString(),
             'Low Utilization ⚠️',
             `Station ${station.name} has received only ${sessionCount} sessions today.`,
@@ -95,7 +95,7 @@ const initCronJobs = () => {
       });
 
       for (const station of stationsDue) {
-        await notificationService.sendPartnerNotification(
+        await notificationService.sendToPartner(
           station.partner.toString(),
           'Maintenance Reminder 🔧',
           `Station ${station.name} maintenance is due tomorrow.`,
