@@ -137,6 +137,9 @@ app.use('/api/cms', cmsRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/reports', reportRoutes);
+const chatRoutes = require('./routes/chatRoutes');
+app.use('/api/chat', chatRoutes);
+
 app.use('/api/audit', auditRoutes);
 app.use('/api/security', securityRoutes);
 app.use('/api/settings', settingsRoutes);
@@ -179,6 +182,19 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+const http = require('http');
+const { Server } = require('socket.io');
+
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
+});
+
+require('./config/socket')(io);
+
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });
