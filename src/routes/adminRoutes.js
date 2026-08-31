@@ -25,7 +25,7 @@ const {
   deleteSubAdmin,
   getPermissionsList
 } = require('../controllers/adminController');
-const { protect, isSuperAdmin } = require('../middlewares/authMiddleware');
+const { protect, isSuperAdmin, hasPermission } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
 
 router.post('/register', registerAdmin);
@@ -50,13 +50,13 @@ router.delete('/notifications/broadcasts/:id', protect, deleteBroadcast);
 router.post('/notifications/broadcasts/:id/resend', protect, resendBroadcast);
 
 // Payouts
-router.get('/payouts', protect, getAllPayouts);
-router.put('/payouts/:id/status', protect, updatePayoutStatus);
+router.get('/payouts', protect, hasPermission('payouts'), getAllPayouts);
+router.put('/payouts/:id/status', protect, hasPermission('payouts'), updatePayoutStatus);
 
 // Partner Complaints
-router.get('/partner-complaints', protect, getAllPartnerComplaints);
-router.put('/partner-complaints/:id/status', protect, updatePartnerComplaintStatus);
-router.post('/partner-complaints/:id/reply', protect, replyToPartnerComplaint);
+router.get('/partner-complaints', protect, hasPermission('partner-complaints'), getAllPartnerComplaints);
+router.put('/partner-complaints/:id/status', protect, hasPermission('partner-complaints'), updatePartnerComplaintStatus);
+router.post('/partner-complaints/:id/reply', protect, hasPermission('partner-complaints'), replyToPartnerComplaint);
 
 // Sub-Admin Management (SuperAdmin only)
 router.get('/subadmins/permissions', protect, isSuperAdmin, getPermissionsList);
