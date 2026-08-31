@@ -18,9 +18,14 @@ const {
   updatePayoutStatus,
   getAllPartnerComplaints,
   updatePartnerComplaintStatus,
-  replyToPartnerComplaint
+  replyToPartnerComplaint,
+  getSubAdmins,
+  createSubAdmin,
+  updateSubAdmin,
+  deleteSubAdmin,
+  getPermissionsList
 } = require('../controllers/adminController');
-const { protect } = require('../middlewares/authMiddleware');
+const { protect, isSuperAdmin } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
 
 router.post('/register', registerAdmin);
@@ -52,5 +57,14 @@ router.put('/payouts/:id/status', protect, updatePayoutStatus);
 router.get('/partner-complaints', protect, getAllPartnerComplaints);
 router.put('/partner-complaints/:id/status', protect, updatePartnerComplaintStatus);
 router.post('/partner-complaints/:id/reply', protect, replyToPartnerComplaint);
+
+// Sub-Admin Management (SuperAdmin only)
+router.get('/subadmins/permissions', protect, isSuperAdmin, getPermissionsList);
+router.route('/subadmins')
+  .get(protect, isSuperAdmin, getSubAdmins)
+  .post(protect, isSuperAdmin, createSubAdmin);
+router.route('/subadmins/:id')
+  .put(protect, isSuperAdmin, updateSubAdmin)
+  .delete(protect, isSuperAdmin, deleteSubAdmin);
 
 module.exports = router;
