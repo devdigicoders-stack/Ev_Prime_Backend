@@ -76,7 +76,7 @@ router.delete('/me/documents/:id', protectPartner, deleteDocument);
 
 // Staff
 router.get('/me/staff', protectPartner, getMyStaff);
-router.post('/me/staff', protectPartner, addMyStaff);
+router.post('/me/staff', protectPartner, upload.single('profilePic'), addMyStaff);
 router.put('/me/staff/:staffId', protectPartner, updateMyStaff);
 router.delete('/me/staff/:staffId', protectPartner, removeMyStaff);
 

@@ -9,6 +9,8 @@ const connectDB = require('./config/db');
 
 // Connect to database
 const mongoose = require('mongoose');
+const initCronJobs = require('./cron/notificationJobs');
+
 connectDB().then(async () => {
   // Auto-seed ConnectorMaster if empty
   try {
@@ -24,9 +26,12 @@ connectDB().then(async () => {
       ]);
       console.log('Auto-seeded 5 default connector types.');
     }
-  } catch (e) {
-    console.error('Auto-seed connectors failed:', e.message);
-  }
+    } catch (e) {
+      console.error('Auto-seed connectors failed:', e.message);
+    }
+
+    // Initialize Cron Jobs
+    initCronJobs();
 });
 
 const app = express();
@@ -132,6 +137,9 @@ app.use('/api/cms', cmsRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/reports', reportRoutes);
+const chatRoutes = require('./routes/chatRoutes');
+app.use('/api/chat', chatRoutes);
+
 app.use('/api/audit', auditRoutes);
 app.use('/api/security', securityRoutes);
 app.use('/api/settings', settingsRoutes);
@@ -174,6 +182,19 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+const http = require('http');
+const { Server } = require('socket.io');
+
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
+});
+
+require('./config/socket')(io);
+
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });

@@ -25,6 +25,8 @@ const stationSchema = new mongoose.Schema({
     enum: ['Active', 'Maintenance', 'Offline'],
     default: 'Active'
   },
+  offlineNotificationSent: { type: Boolean, default: false },
+  maintenanceDate: { type: Date },
   image: { type: String },
   amenities: [{ type: String }],
   openHours: { type: String, default: '24/7' },

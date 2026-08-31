@@ -342,8 +342,8 @@ const updatePayoutStatus = async (req, res) => {
     await payout.save();
     
     // Notify Partner
-    const title = status === 'Completed' ? 'Payout Completed! 💰' : 'Payout Rejected ❌';
-    const body = status === 'Completed' ? `Your withdrawal request for ₹${payout.amount} has been successfully processed.` : `Your withdrawal request for ₹${payout.amount} was rejected. ${remarks ? `Reason: ${remarks}` : ''}`;
+    const title = status === 'Completed' ? 'Payout Processed' : 'Payout Rejected ❌';
+    const body = status === 'Completed' ? `₹${payout.amount} transferred to your bank account.` : `Your withdrawal request for ₹${payout.amount} was rejected. ${remarks ? `Reason: ${remarks}` : ''}`;
     
     await notificationService.sendToPartner(
       payout.partner.toString(),

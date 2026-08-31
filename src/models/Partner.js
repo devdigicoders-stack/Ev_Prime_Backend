@@ -59,6 +59,7 @@ const partnerSchema = new mongoose.Schema({
   staff: [{
     name: String,
     email: String,
+    profilePic: String,
     role: { type: String, enum: ['Owner', 'Manager', 'Employee'], default: 'Employee' },
     addedAt: { type: Date, default: Date.now }
   }],

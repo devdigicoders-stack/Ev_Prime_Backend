@@ -33,6 +33,10 @@ const createStation = async (req, res) => {
 
     const station = await Station.create(stationData);
 
+    // Update partner's stationsCount
+    const Partner = require('../models/Partner');
+    await Partner.findOneAndUpdate({ name: partner }, { $inc: { stationsCount: 1 } });
+
     // Notify all users about the new station
     await notificationService.sendToAllUsers(
       'New Charging Station! 🔋',
@@ -83,8 +87,29 @@ const updateStation = async (req, res) => {
     const station = await Station.findById(req.params.id);
     if (!station) return res.status(404).json({ message: 'Station not found' });
 
+    const oldStatus = station.status;
+    
     const fields = ['name','location','city','address','latitude','longitude','powerCapacity','connectors','partner','status','openHours'];
     fields.forEach(f => { if (req.body[f] !== undefined) station[f] = req.body[f]; });
+
+    const newStatus = station.status;
+
+    // Instant notification logic
+    if (oldStatus !== 'Offline' && newStatus === 'Offline') {
+      const Partner = require('../models/Partner');
+      const partnerDoc = await Partner.findOne({ name: station.partner });
+      if (partnerDoc) {
+        await notificationService.sendToPartner(
+          partnerDoc._id.toString(),
+          'Station Offline 🔴',
+          `Station ${station.name} has just gone offline.`,
+          'alert'
+        );
+      }
+      station.offlineNotificationSent = true;
+    } else if (oldStatus === 'Offline' && newStatus !== 'Offline') {
+      station.offlineNotificationSent = false;
+    }
 
     if (req.body.connectorTypes !== undefined) {
       try {
@@ -180,7 +205,11 @@ const deleteStation = async (req, res) => {
     const station = await Station.findById(req.params.id);
 
     if (station) {
-      await Station.deleteOne({ _id: station._id });
+      // Update partner's stationsCount
+      const Partner = require('../models/Partner');
+      await Partner.findOneAndUpdate({ name: station.partner }, { $inc: { stationsCount: -1 } });
+
+      await station.deleteOne();
       res.json({ message: 'Station removed successfully' });
     } else {
       res.status(404).json({ message: 'Station not found' });
