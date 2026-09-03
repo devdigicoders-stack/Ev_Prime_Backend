@@ -15,12 +15,33 @@ const protect = async (req, res, next) => {
       if (!req.admin) {
         return res.status(401).json({ message: 'Not authorized, admin not found' });
       }
+      if (!req.admin.isActive) {
+        return res.status(403).json({ message: 'Your account has been deactivated by super admin.' });
+      }
       return next();
     } catch (error) {
       return res.status(401).json({ message: 'Not authorized, token failed' });
     }
   }
   return res.status(401).json({ message: 'Not authorized, no token' });
+};
+
+// Only superadmin can access this route
+const isSuperAdmin = (req, res, next) => {
+  if (req.admin && req.admin.adminType === 'superadmin') {
+    return next();
+  }
+  return res.status(403).json({ message: 'Access denied. Super Admin only.' });
+};
+
+// Check if admin has permission for a specific module
+const hasPermission = (module) => (req, res, next) => {
+  if (!req.admin) return res.status(401).json({ message: 'Not authorized' });
+  // superadmin always has full access
+  if (req.admin.adminType === 'superadmin') return next();
+  // subadmin must have the module in their permissions array
+  if (req.admin.permissions && req.admin.permissions.includes(module)) return next();
+  return res.status(403).json({ message: `Access denied. You don't have permission for: ${module}` });
 };
 
 const protectUser = async (req, res, next) => {
@@ -92,4 +113,4 @@ const protectAdminOrUser = async (req, res, next) => {
   return res.status(401).json({ message: 'Not authorized, no token' });
 };
 
-module.exports = { protect, protectUser, protectPartner, protectAdminOrUser };
+module.exports = { protect, protectUser, protectPartner, protectAdminOrUser, isSuperAdmin, hasPermission };
