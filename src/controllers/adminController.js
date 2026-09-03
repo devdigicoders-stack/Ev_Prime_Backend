@@ -59,10 +59,15 @@ const loginAdmin = async (req, res) => {
     const admin = await Admin.findOne({ email });
 
     if (admin && (await admin.matchPassword(password))) {
+      if (!admin.isActive) {
+        return res.status(403).json({ message: 'Your account has been deactivated. Contact super admin.' });
+      }
       res.json({
         _id: admin._id,
         name: admin.name,
         email: admin.email,
+        adminType: admin.adminType,
+        permissions: admin.permissions,
         token: generateToken(admin._id),
       });
     } else {
@@ -91,6 +96,8 @@ const getAdminProfile = async (req, res) => {
         location: admin.location,
         office: admin.office,
         profileImage: admin.profileImage,
+        adminType: admin.adminType,
+        permissions: admin.permissions,
         createdAt: admin.createdAt
       });
     } else {
@@ -430,6 +437,75 @@ const replyToPartnerComplaint = async (req, res) => {
   }
 };
 
+// @desc    Get all sub-admins
+// @route   GET /api/admin/subadmins
+// @access  Superadmin only
+const getSubAdmins = async (req, res) => {
+  try {
+    const subAdmins = await Admin.find({ adminType: 'subadmin' }).select('-password').sort('-createdAt');
+    res.json({ success: true, data: subAdmins });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Create sub-admin
+// @route   POST /api/admin/subadmins
+// @access  Superadmin only
+const createSubAdmin = async (req, res) => {
+  try {
+    const { name, email, password, role, phone, permissions, isActive } = req.body;
+    const exists = await Admin.findOne({ email });
+    if (exists) return res.status(400).json({ message: 'Email already in use' });
+    const subAdmin = await Admin.create({
+      name, email, password,
+      role: role || 'Sub Administrator',
+      phone: phone || '',
+      permissions: permissions || [],
+      isActive: isActive !== undefined ? isActive : true,
+      adminType: 'subadmin'
+    });
+    res.status(201).json({ success: true, message: 'Sub-admin created successfully', data: subAdmin });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Update sub-admin
+// @route   PUT /api/admin/subadmins/:id
+// @access  Superadmin only
+const updateSubAdmin = async (req, res) => {
+  try {
+    const { name, email, password, role, phone, permissions, isActive } = req.body;
+    const subAdmin = await Admin.findOne({ _id: req.params.id, adminType: 'subadmin' });
+    if (!subAdmin) return res.status(404).json({ message: 'Sub-admin not found' });
+    if (name) subAdmin.name = name;
+    if (email) subAdmin.email = email;
+    if (password) subAdmin.password = password;
+    if (role !== undefined) subAdmin.role = role;
+    if (phone !== undefined) subAdmin.phone = phone;
+    if (permissions !== undefined) subAdmin.permissions = permissions;
+    if (isActive !== undefined) subAdmin.isActive = isActive;
+    await subAdmin.save();
+    res.json({ success: true, message: 'Sub-admin updated successfully', data: subAdmin });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Delete sub-admin
+// @route   DELETE /api/admin/subadmins/:id
+// @access  Superadmin only
+const deleteSubAdmin = async (req, res) => {
+  try {
+    const subAdmin = await Admin.findOneAndDelete({ _id: req.params.id, adminType: 'subadmin' });
+    if (!subAdmin) return res.status(404).json({ message: 'Sub-admin not found' });
+    res.json({ success: true, message: 'Sub-admin deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   registerAdmin,
   loginAdmin,
@@ -448,5 +524,9 @@ module.exports = {
   updatePayoutStatus,
   getAllPartnerComplaints,
   updatePartnerComplaintStatus,
-  replyToPartnerComplaint
+  replyToPartnerComplaint,
+  getSubAdmins,
+  createSubAdmin,
+  updateSubAdmin,
+  deleteSubAdmin
 };

@@ -283,8 +283,17 @@ const getDashboardData = async (req, res) => {
       recentActivities = recentLogs.map((log, i) => {
         const diffMs = new Date() - new Date(log.createdAt);
         const diffMins = Math.floor(diffMs / 60000);
-        let timeStr = diffMins < 60 ? `${diffMins} min ago` : `${Math.floor(diffMins / 60)} hrs ago`;
-        if (diffMins === 0) timeStr = 'Just now';
+        let timeStr;
+        if (diffMins === 0) {
+          timeStr = 'Just now';
+        } else if (diffMins < 60) {
+          timeStr = `${diffMins} min ago`;
+        } else if (diffMins < 720) {
+          timeStr = `${Math.floor(diffMins / 60)} hrs ago`;
+        } else {
+          const diffDays = Math.floor(diffMins / 1440);
+          timeStr = diffDays <= 0 ? `${Math.floor(diffMins / 60)} hrs ago` : diffDays === 1 ? `1 day ago` : `${diffDays} days ago`;
+        }
 
         let iconType = 'Zap';
         let color = 'text-blue-600';

@@ -37,6 +37,19 @@ const adminSchema = new mongoose.Schema({
   fcmToken: {
     type: String,
     default: ''
+  },
+  adminType: {
+    type: String,
+    enum: ['superadmin', 'subadmin'],
+    default: 'superadmin'
+  },
+  permissions: {
+    type: [String],
+    default: []
+  },
+  isActive: {
+    type: Boolean,
+    default: true
   }
 }, {
   timestamps: true
