@@ -291,8 +291,8 @@ const getDashboardData = async (req, res) => {
         } else if (diffMins < 720) {
           timeStr = `${Math.floor(diffMins / 60)} hrs ago`;
         } else {
-          const diffDays = Math.floor(diffMins / 1440);
-          timeStr = diffDays <= 0 ? `${Math.floor(diffMins / 60)} hrs ago` : diffDays === 1 ? `1 day ago` : `${diffDays} days ago`;
+          const diffDays = Math.max(1, Math.round(diffMins / 1440));
+          timeStr = diffDays === 1 ? `1 day ago` : `${diffDays} days ago`;
         }
 
         let iconType = 'Zap';
