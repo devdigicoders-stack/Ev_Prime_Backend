@@ -1,11 +1,10 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-// All available permissions in the system
 const ALL_PERMISSIONS = [
   'dashboard', 'users', 'bookings', 'stations', 'partners', 'partner-complaints',
   'payments', 'payouts', 'refunds', 'offers', 'news', 'emergency', 'feedback',
-  'pricing', 'tickets', 'support', 'enquiries', 'newsletter', 'our-team',
+  'pricing', 'tickets', 'support', 'live-chat', 'enquiries', 'newsletter', 'our-team',
   'reviews', 'blog', 'faq', 'marketplace', 'franchise', 'analytics', 'carbon',
   'gov', 'heatmap', 'cities', 'cms', 'connectors', 'reports', 'audit', 'security', 'settings'
 ];
@@ -62,19 +61,6 @@ const adminSchema = new mongoose.Schema({
   fcmToken: {
     type: String,
     default: ''
-  },
-  adminType: {
-    type: String,
-    enum: ['superadmin', 'subadmin'],
-    default: 'superadmin'
-  },
-  permissions: {
-    type: [String],
-    default: []
-  },
-  isActive: {
-    type: Boolean,
-    default: true
   }
 }, {
   timestamps: true
