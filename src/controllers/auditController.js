@@ -9,13 +9,20 @@ const getAuditLogs = async (req, res) => {
 
     let query = {};
 
+    if (req.admin && req.admin.adminType === 'subadmin') {
+      query.user = req.admin.name;
+    }
+
     // Search filter (User, Action, or Details)
     if (search) {
-      query.$or = [
-        { user: { $regex: search, $options: 'i' } },
-        { action: { $regex: search, $options: 'i' } },
-        { details: { $regex: search, $options: 'i' } },
-      ];
+      query.$and = query.$and || [];
+      query.$and.push({
+        $or: [
+          { user: { $regex: search, $options: 'i' } },
+          { action: { $regex: search, $options: 'i' } },
+          { details: { $regex: search, $options: 'i' } },
+        ]
+      });
     }
 
     // Module filter

@@ -277,7 +277,11 @@ const getDashboardData = async (req, res) => {
     }
 
     // 7. Recent Activities
-    const recentLogs = await AuditLog.find().sort({ createdAt: -1 }).limit(5).lean();
+    let logQuery = {};
+    if (req.admin && req.admin.adminType === 'subadmin') {
+      logQuery.user = req.admin.name;
+    }
+    const recentLogs = await AuditLog.find(logQuery).sort({ createdAt: -1 }).limit(5).lean();
     let recentActivities = [];
     if (recentLogs.length > 0) {
       recentActivities = recentLogs.map((log, i) => {
