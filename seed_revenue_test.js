@@ -2,7 +2,7 @@ require('dotenv').config({ path: './src/../.env' });
 const mongoose = require('mongoose');
 
 const MONGO_URI = process.env.MONGO_URI;
-const STATION_ID = '6a60916559c51f4623484fbe';
+const STATION_OID = new mongoose.Types.ObjectId('6a60916559c51f4623484fbe');
 const PARTNER_NAME = 'DCT';
 
 const bookingSchema = new mongoose.Schema({}, { strict: false });
@@ -15,6 +15,10 @@ const users = ['user001', 'user002', 'user003', 'user004', 'user005'];
 async function seedRevenue() {
   await mongoose.connect(MONGO_URI);
   console.log('✅ Connected to MongoDB');
+
+  // Delete previously inserted wrong test data (station stored as string)
+  const deleted = await Booking.deleteMany({ bookingId: /^BK-TEST-/ });
+  console.log(`🗑️  Deleted ${deleted.deletedCount} old test bookings`);
 
   const today = new Date();
   today.setHours(23, 59, 59, 0);
@@ -41,9 +45,12 @@ async function seedRevenue() {
       const amount = Math.round(units * pricePerUnit);
       const status = dayOffset === 0 ? 'Charging' : statuses[Math.floor(Math.random() * statuses.length)];
 
+      // small delay to ensure unique timestamp in bookingId
+      await new Promise(r => setTimeout(r, 5));
+
       await Booking.create({
         bookingId: `BK-TEST-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-        station: STATION_ID,
+        station: STATION_OID,        // ✅ ObjectId, not string
         stationName: 'blue berry',
         partner: PARTNER_NAME,
         user: users[Math.floor(Math.random() * users.length)],
@@ -65,7 +72,7 @@ async function seedRevenue() {
     }
   }
 
-  console.log(`\n✅ Inserted ${inserted} test bookings for last 7 days!`);
+  console.log(`\n✅ Inserted ${inserted} test bookings (station as ObjectId)`);
   await mongoose.disconnect();
 }
 

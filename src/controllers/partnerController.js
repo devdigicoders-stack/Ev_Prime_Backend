@@ -586,11 +586,26 @@ const getMyRevenue = async (req, res) => {
       isUp = true;
     }
 
-    // 7-day Revenue Graph Trend
+    // Smart 7-day Revenue Graph:
+    // For All Time / Custom — anchor to the most recent booking's date so chart always shows data
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const revenueGraph = [];
+
+    // Find the most recent booking date among currentBookings
+    let anchorDate = new Date(today);
+    if (currentBookings.length > 0) {
+      const latestBooking = currentBookings.reduce((latest, b) => {
+        const bDate = new Date(b.createdAt);
+        return bDate > latest ? bDate : latest;
+      }, new Date(0));
+      // Use the most recent booking date as anchor (end of 7-day window)
+      const latestDay = new Date(latestBooking.getFullYear(), latestBooking.getMonth(), latestBooking.getDate());
+      // Anchor = max(today, latestDay) so we don't go into future
+      anchorDate = latestDay > today ? today : latestDay;
+    }
+
     for (let i = 6; i >= 0; i--) {
-      const d = new Date(today);
+      const d = new Date(anchorDate);
       d.setDate(d.getDate() - i);
       const nextD = new Date(d);
       nextD.setDate(nextD.getDate() + 1);
@@ -603,7 +618,7 @@ const getMyRevenue = async (req, res) => {
 
       revenueGraph.push({
         day: dayNames[d.getDay()],
-        date: `${d.getDate()} ${d.toLocaleString('default', { month: 'short' })}`,
+        date: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`,
         revenue: Math.round(dayRev * 100) / 100,
         bookings: dayBookings.length
       });
