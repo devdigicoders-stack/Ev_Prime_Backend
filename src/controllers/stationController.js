@@ -27,6 +27,7 @@ const createStation = async (req, res) => {
       connectorTypes: parsedConnectorTypes,
       amenities: amenities ? (typeof amenities === 'string' ? JSON.parse(amenities) : amenities) : [],
       openHours: openHours || '24/7',
+      createdBy: req.admin ? req.admin._id : null
     };
 
     if (req.file) stationData.image = `/uploads/${req.file.filename}`;
@@ -56,7 +57,11 @@ const createStation = async (req, res) => {
 // @access  Private (Admin)
 const getAllStations = async (req, res) => {
   try {
-    const stations = await Station.find({}).sort({ createdAt: -1 });
+    let query = {};
+    if (req.admin && req.admin.adminType === 'subadmin') {
+      query.createdBy = req.admin._id;
+    }
+    const stations = await Station.find(query).sort({ createdAt: -1 });
     res.json(stations);
   } catch (error) {
     res.status(500).json({ message: error.message });

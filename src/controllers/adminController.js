@@ -181,7 +181,7 @@ const changePassword = async (req, res) => {
 // @access  Private (Admin)
 const sendCustomNotification = async (req, res) => {
   try {
-    const { title, body, type, userId } = req.body;
+    const { title, body, type, userId, imageUrl } = req.body;
 
     if (!title || !body) {
       return res.status(400).json({ message: 'Title and body are required' });
@@ -193,17 +193,17 @@ const sendCustomNotification = async (req, res) => {
       }
       
       // Send to specific user
-      const result = await notificationService.sendToUser(userId.trim(), title, body, {}, type || 'alert');
+      const result = await notificationService.sendToUser(userId.trim(), title, body, {}, type || 'alert', imageUrl);
       
-      await AdminBroadcast.create({ title, body, type: type || 'alert', targetUserId: userId.trim() });
+      await AdminBroadcast.create({ title, body, type: type || 'alert', targetUserId: userId.trim(), imageUrl });
       return res.json({ message: 'Notification sent successfully', result });
     } else {
       // Send to all users
       const users = await User.find({}).select('_id');
       const userIds = users.map(u => u._id);
-      const result = await notificationService.sendToMultipleUsers(userIds, title, body, {}, type || 'alert');
+      const result = await notificationService.sendToMultipleUsers(userIds, title, body, {}, type || 'alert', imageUrl);
       
-      await AdminBroadcast.create({ title, body, type: type || 'alert' });
+      await AdminBroadcast.create({ title, body, type: type || 'alert', imageUrl });
       return res.json({ message: 'Notifications sent successfully to all users', result });
     }
   } catch (error) {
@@ -244,12 +244,12 @@ const resendBroadcast = async (req, res) => {
     if (!broadcast) return res.status(404).json({ message: 'Broadcast not found' });
 
     if (broadcast.targetUserId) {
-      const result = await notificationService.sendToUser(broadcast.targetUserId, broadcast.title, broadcast.body, {}, broadcast.type);
+      const result = await notificationService.sendToUser(broadcast.targetUserId, broadcast.title, broadcast.body, {}, broadcast.type, broadcast.imageUrl);
       res.json({ message: 'Resent to specific user', result });
     } else {
       const users = await User.find({}).select('_id');
       const userIds = users.map(u => u._id);
-      const result = await notificationService.sendToMultipleUsers(userIds, broadcast.title, broadcast.body, {}, broadcast.type);
+      const result = await notificationService.sendToMultipleUsers(userIds, broadcast.title, broadcast.body, {}, broadcast.type, broadcast.imageUrl);
       res.json({ message: 'Resent to all users', result });
     }
   } catch (error) {
@@ -469,8 +469,11 @@ const createSubAdmin = async (req, res) => {
     const exists = await Admin.findOne({ email });
     if (exists) return res.status(400).json({ message: 'Email already in use' });
 
-    // Validate permissions against allowed list
-    const validPermissions = (permissions || []).filter(p => ALL_PERMISSIONS.includes(p));
+    // Validate permissions against allowed list (supports module.action format)
+    const validPermissions = (permissions || []).filter(p => {
+      const mod = p.includes('.') ? p.split('.')[0] : p;
+      return ALL_PERMISSIONS.includes(mod);
+    });
 
     const subAdmin = await Admin.create({
       name,
@@ -519,7 +522,12 @@ const updateSubAdmin = async (req, res) => {
     if (role) subAdmin.role = role;
     if (phone !== undefined) subAdmin.phone = phone;
     if (isActive !== undefined) subAdmin.isActive = isActive;
-    if (permissions) subAdmin.permissions = permissions.filter(p => ALL_PERMISSIONS.includes(p));
+    if (permissions) {
+      subAdmin.permissions = permissions.filter(p => {
+        const mod = p.includes('.') ? p.split('.')[0] : p;
+        return ALL_PERMISSIONS.includes(mod);
+      });
+    }
     if (password && password.trim() !== '') subAdmin.password = password;
 
     await subAdmin.save();

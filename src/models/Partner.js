@@ -63,6 +63,10 @@ const partnerSchema = new mongoose.Schema({
     role: { type: String, enum: ['Owner', 'Manager', 'Employee'], default: 'Employee' },
     addedAt: { type: Date, default: Date.now }
   }],
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin'
+  }
 }, { timestamps: true });
 
 partnerSchema.pre('save', async function (next) {

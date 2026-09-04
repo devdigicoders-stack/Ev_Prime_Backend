@@ -294,6 +294,12 @@ const getAllBookingsAdmin = async (req, res) => {
     const filter = {};
     if (status && status !== 'All') filter.status = status;
 
+    if (req.admin && req.admin.adminType === 'subadmin') {
+      const stations = await Station.find({ createdBy: req.admin._id }).select('_id');
+      const stationIds = stations.map(s => s._id);
+      filter.station = { $in: stationIds };
+    }
+
     let bookings = await Booking.find(filter)
       .populate('user', 'name mobile email')
       .populate('station', 'name location city')
@@ -315,12 +321,12 @@ const getAllBookingsAdmin = async (req, res) => {
 
     // Stats
     const stats = {
-      total: await Booking.countDocuments(),
-      confirmed: await Booking.countDocuments({ status: 'Confirmed' }),
-      completed: await Booking.countDocuments({ status: 'Completed' }),
-      cancelled: await Booking.countDocuments({ status: 'Cancelled' }),
+      total: await Booking.countDocuments(filter),
+      confirmed: await Booking.countDocuments({ ...filter, status: 'Confirmed' }),
+      completed: await Booking.countDocuments({ ...filter, status: 'Completed' }),
+      cancelled: await Booking.countDocuments({ ...filter, status: 'Cancelled' }),
       totalRevenue: (await Booking.aggregate([
-        { $match: { paymentStatus: 'Paid' } },
+        { $match: { ...filter, paymentStatus: 'Paid' } },
         { $group: { _id: null, total: { $sum: '$estimatedCost' } } }
       ]))[0]?.total || 0,
     };

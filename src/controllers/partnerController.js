@@ -18,7 +18,12 @@ const createPartner = async (req, res) => {
     const partnerExists = await Partner.findOne({ email });
     if (partnerExists) return res.status(400).json({ message: 'Partner with this email already exists' });
 
-    const partner = await Partner.create({ name, contactPerson, email, phone, status: status || 'Active', stationsCount: stationsCount || 0 });
+    const partner = await Partner.create({ 
+      name, contactPerson, email, phone, 
+      status: status || 'Active', 
+      stationsCount: stationsCount || 0,
+      createdBy: req.admin ? req.admin._id : null
+    });
 
     await createAuditLog({
       user: req.admin ? req.admin.name : 'System',
@@ -37,7 +42,11 @@ const createPartner = async (req, res) => {
 // @access  Admin
 const getAllPartners = async (req, res) => {
   try {
-    const partners = await Partner.find({}).select('-appPassword');
+    let query = {};
+    if (req.admin && req.admin.adminType === 'subadmin') {
+      query.createdBy = req.admin._id;
+    }
+    const partners = await Partner.find(query).select('-appPassword');
     res.json(partners);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -406,7 +415,7 @@ const getMyBookings = async (req, res) => {
   try {
     const stations = await Station.find({ partner: req.partner.name });
     const stationIds = stations.map(s => s._id);
-    const { status, dateFilter, limit = 50, page = 1 } = req.query;
+    const { status, dateFilter, startDate, endDate, limit = 50, page = 1 } = req.query;
     const filter = { station: { $in: stationIds } };
     if (status) {
       if (status === 'Ongoing') {
@@ -430,6 +439,11 @@ const getMyBookings = async (req, res) => {
         monthAgo.setMonth(monthAgo.getMonth() - 1);
         filter.createdAt = { $gte: monthAgo };
       }
+    } else if (startDate && endDate) {
+      filter.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
+      };
     }
 
     const bookings = await Booking.find(filter)

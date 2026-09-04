@@ -26,6 +26,21 @@ const getDashboardData = async (req, res) => {
     const sixtyDaysAgo = new Date();
     sixtyDaysAgo.setDate(now.getDate() - 60);
 
+    let stationQuery = {};
+    let partnerQuery = {};
+    let bookingMatch = { status: { $in: ['Completed', 'Confirmed', 'Ongoing'] } };
+    let bookingPaidMatch = { status: { $in: ['Completed', 'Confirmed'] }, paymentStatus: 'Paid' };
+
+    if (req.admin && req.admin.adminType === 'subadmin') {
+      stationQuery.createdBy = req.admin._id;
+      partnerQuery.createdBy = req.admin._id;
+      
+      const subadminStations = await Station.find({ createdBy: req.admin._id }).select('_id');
+      const subadminStationIds = subadminStations.map(s => s._id);
+      bookingMatch.station = { $in: subadminStationIds };
+      bookingPaidMatch.station = { $in: subadminStationIds };
+    }
+
     // 1. Basic Stats (Users, Stations, Partners) with Growth
     const [
       totalUsers, prevUsers,
@@ -34,10 +49,10 @@ const getDashboardData = async (req, res) => {
     ] = await Promise.all([
       User.countDocuments(),
       User.countDocuments({ createdAt: { $lt: thirtyDaysAgo } }),
-      Station.countDocuments(),
-      Station.countDocuments({ createdAt: { $lt: thirtyDaysAgo } }),
-      Partner.countDocuments(),
-      Partner.countDocuments({ createdAt: { $lt: thirtyDaysAgo } })
+      Station.countDocuments(stationQuery),
+      Station.countDocuments({ ...stationQuery, createdAt: { $lt: thirtyDaysAgo } }),
+      Partner.countDocuments(partnerQuery),
+      Partner.countDocuments({ ...partnerQuery, createdAt: { $lt: thirtyDaysAgo } })
     ]);
 
     const usersGrowth = calculateGrowth(totalUsers, prevUsers);
@@ -45,18 +60,16 @@ const getDashboardData = async (req, res) => {
     const partnersGrowth = calculateGrowth(totalPartners, prevPartners);
 
     // Active & Offline Stations
-    const activeStations = await Station.countDocuments({ status: 'Active' });
+    const activeStations = await Station.countDocuments({ ...stationQuery, status: 'Active' });
     const offlineStations = totalStations - activeStations;
 
     // Map Data
-    const mapData = await Station.find({}, 'name location city latitude longitude status connectorTypes.type');
+    const mapData = await Station.find(stationQuery, 'name location city latitude longitude status connectorTypes.type');
 
     // 2. Booking Stats (Revenue, Sessions, Energy) with Growth
     const bookingStats = await Booking.aggregate([
       {
-        $match: {
-          status: { $in: ['Completed', 'Confirmed', 'Ongoing'] }
-        }
+        $match: bookingMatch
       },
       {
         $facet: {
@@ -159,7 +172,7 @@ const getDashboardData = async (req, res) => {
     const dailyRevenue = await Booking.aggregate([
       { 
         $match: { 
-          status: { $in: ['Completed', 'Confirmed', 'Ongoing'] },
+          ...bookingMatch,
           createdAt: { $gte: fourteenDaysAgo }
         } 
       },
@@ -187,8 +200,7 @@ const getDashboardData = async (req, res) => {
     const dailyEnergy = await Booking.aggregate([
       { 
         $match: { 
-          status: { $in: ['Completed', 'Confirmed'] },
-          paymentStatus: 'Paid',
+          ...bookingPaidMatch,
           createdAt: { $gte: thirtyDaysAgoStart }
         } 
       },
@@ -212,7 +224,7 @@ const getDashboardData = async (req, res) => {
 
     // 5. Revenue by City (Donut & Top Cities List)
     const cityAgg = await Booking.aggregate([
-      { $match: { status: { $in: ['Completed', 'Confirmed'] }, paymentStatus: 'Paid' } },
+      { $match: bookingPaidMatch },
       {
         $lookup: {
           from: 'stations',
@@ -225,7 +237,21 @@ const getDashboardData = async (req, res) => {
       { 
         $group: { 
           _id: "$stationDetails.city", 
-          revenue: { $sum: "$estimatedCost" } 
+          revenue: { $sum: "$estimatedCost" },
+          currentRevenue: {
+            $sum: {
+              $cond: [{ $gte: ["$createdAt", thirtyDaysAgo] }, "$estimatedCost", 0]
+            }
+          },
+          prevRevenue: {
+            $sum: {
+              $cond: [
+                { $and: [{ $gte: ["$createdAt", sixtyDaysAgo] }, { $lt: ["$createdAt", thirtyDaysAgo] }] },
+                "$estimatedCost",
+                0
+              ]
+            }
+          }
         } 
       },
       { $sort: { revenue: -1 } }
@@ -251,14 +277,14 @@ const getDashboardData = async (req, res) => {
           id: i + 1,
           name: c._id || 'Unknown',
           revenue: `₹${c.revenue.toLocaleString()}`,
-          growth: `+0%` // Simplified for now since historical city growth requires complex facet
+          growth: calculateGrowth(c.currentRevenue, c.prevRevenue)
         };
       });
     }
 
     // 6. Sessions by Connector (Donut)
     const connectorAgg = await Booking.aggregate([
-      { $match: { status: { $in: ['Completed', 'Confirmed'] } } },
+      { $match: { ...bookingMatch, status: { $in: ['Completed', 'Confirmed'] } } },
       { $group: { _id: "$connectorType", count: { $sum: 1 } } },
       { $sort: { count: -1 } }
     ]);
@@ -326,8 +352,27 @@ const getDashboardData = async (req, res) => {
 
     // 8. Top Stations
     const stationsAgg = await Booking.aggregate([
-      { $match: { status: { $in: ['Completed', 'Confirmed'] }, paymentStatus: 'Paid' } },
-      { $group: { _id: "$station", revenue: { $sum: "$estimatedCost" } } },
+      { $match: bookingPaidMatch },
+      { 
+        $group: { 
+          _id: "$station", 
+          revenue: { $sum: "$estimatedCost" },
+          currentRevenue: {
+            $sum: {
+              $cond: [{ $gte: ["$createdAt", thirtyDaysAgo] }, "$estimatedCost", 0]
+            }
+          },
+          prevRevenue: {
+            $sum: {
+              $cond: [
+                { $and: [{ $gte: ["$createdAt", sixtyDaysAgo] }, { $lt: ["$createdAt", thirtyDaysAgo] }] },
+                "$estimatedCost",
+                0
+              ]
+            }
+          }
+        } 
+      },
       { $sort: { revenue: -1 } },
       { $limit: 3 },
       {
@@ -347,7 +392,7 @@ const getDashboardData = async (req, res) => {
         id: st._id,
         name: st.stationDetails.name,
         revenue: `₹${st.revenue.toLocaleString()}`,
-        growth: `+0%` // Simplified
+        growth: calculateGrowth(st.currentRevenue, st.prevRevenue)
       }));
     }
 

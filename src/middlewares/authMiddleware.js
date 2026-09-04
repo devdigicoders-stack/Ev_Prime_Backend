@@ -34,14 +34,18 @@ const isSuperAdmin = (req, res, next) => {
   return res.status(403).json({ message: 'Access denied. Super Admin only.' });
 };
 
-// Check if admin has permission for a specific module
-const hasPermission = (module) => (req, res, next) => {
+// Check if admin has permission for a specific module and action
+const hasPermission = (module, action = 'view') => (req, res, next) => {
   if (!req.admin) return res.status(401).json({ message: 'Not authorized' });
   // superadmin always has full access
   if (req.admin.adminType === 'superadmin') return next();
-  // subadmin must have the module in their permissions array
-  if (req.admin.permissions && req.admin.permissions.includes(module)) return next();
-  return res.status(403).json({ message: `Access denied. You don't have permission for: ${module}` });
+  
+  // subadmin must have the specific module.action or legacy module
+  const hasLegacyAccess = req.admin.permissions.includes(module);
+  const hasSpecificAccess = req.admin.permissions.includes(`${module}.${action}`);
+  
+  if (hasLegacyAccess || hasSpecificAccess) return next();
+  return res.status(403).json({ message: `Access denied. You don't have permission for: ${module} (${action})` });
 };
 
 const protectUser = async (req, res, next) => {

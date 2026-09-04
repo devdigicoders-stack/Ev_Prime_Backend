@@ -37,6 +37,10 @@ const stationSchema = new mongoose.Schema({
     idleFee: { type: Number, default: 2.00 },
     sessionFee: { type: Number, default: 20.00 },
     peakPrice: { type: Number, default: 26.00 }
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin'
   }
 }, { timestamps: true });
 

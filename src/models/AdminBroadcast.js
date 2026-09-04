@@ -17,6 +17,10 @@ const adminBroadcastSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     default: null // null means sent to all users
+  },
+  imageUrl: {
+    type: String,
+    default: null
   }
 }, {
   timestamps: true

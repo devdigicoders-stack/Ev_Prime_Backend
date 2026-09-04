@@ -22,6 +22,10 @@ const notificationSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.Mixed, // Any additional payload data
     default: {}
   },
+  imageUrl: {
+    type: String,
+    default: null
+  },
   isRead: {
     type: Boolean,
     default: false

@@ -124,8 +124,26 @@ const loginUser = async (req, res) => {
 // @access  Private (Admin)
 const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find({});
-    res.json(users);
+    // SuperAdmin sees all users
+    if (!req.admin.adminType || req.admin.adminType === 'superadmin') {
+      const users = await User.find({}).sort({ createdAt: -1 });
+      return res.json(users);
+    }
+
+    // SubAdmin: only see users who booked at their stations
+    const Station = require('../models/Station');
+    const Booking = require('../models/Booking');
+
+    // Get all stations created by this sub-admin
+    const myStations = await Station.find({ createdBy: req.admin._id }).select('_id');
+    const stationIds = myStations.map(s => s._id);
+
+    // Get unique user IDs who booked at those stations
+    const bookings = await Booking.find({ station: { $in: stationIds } }).distinct('user');
+
+    // Fetch those users
+    const users = await User.find({ _id: { $in: bookings } }).sort({ createdAt: -1 });
+    return res.json(users);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

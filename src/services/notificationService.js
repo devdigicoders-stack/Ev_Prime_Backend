@@ -15,8 +15,9 @@ class NotificationService {
    * @param {String} body - Notification body.
    * @param {Object} data - Additional data payload.
    * @param {String} type - Notification type (e.g., 'booking', 'promo').
+   * @param {String} imageUrl - Optional URL for an image/banner.
    */
-  async sendToUser(userId, title, body, data = {}, type = 'general') {
+  async sendToUser(userId, title, body, data = {}, type = 'general', imageUrl = null) {
     try {
       // 1. Save to Database
       const notification = new Notification({
@@ -24,7 +25,8 @@ class NotificationService {
         title,
         body,
         data,
-        type
+        type,
+        imageUrl
       });
       await notification.save();
 
@@ -40,7 +42,8 @@ class NotificationService {
         const message = {
           notification: {
             title,
-            body
+            body,
+            ...(imageUrl && { imageUrl })
           },
           data: {
             ...data,
@@ -65,10 +68,10 @@ class NotificationService {
   /**
    * Send a push notification to multiple users.
    */
-  async sendToMultipleUsers(userIds, title, body, data = {}, type = 'general') {
+  async sendToMultipleUsers(userIds, title, body, data = {}, type = 'general', imageUrl = null) {
     try {
       const results = await Promise.all(
-        userIds.map(id => this.sendToUser(id, title, body, data, type))
+        userIds.map(id => this.sendToUser(id, title, body, data, type, imageUrl))
       );
       return { success: true, results };
     } catch (error) {
@@ -114,7 +117,7 @@ class NotificationService {
   /**
    * Send a push notification to all Users (e.g. for new stations, general promos)
    */
-  async sendToAllUsers(title, body, data = {}, type = 'general') {
+  async sendToAllUsers(title, body, data = {}, type = 'general', imageUrl = null) {
     try {
       const allUsers = await User.find({});
       if (allUsers.length > 0) {
@@ -124,6 +127,7 @@ class NotificationService {
           body,
           data,
           type,
+          imageUrl,
           isRead: false
         }));
         await Notification.insertMany(notifications);
@@ -134,7 +138,11 @@ class NotificationService {
         const tokens = usersWithToken.map(u => u.fcmToken).filter(Boolean);
         if (tokens.length > 0) {
           const message = {
-            notification: { title, body },
+            notification: { 
+              title, 
+              body,
+              ...(imageUrl && { imageUrl })
+            },
             data: { ...data, type },
             tokens
           };
