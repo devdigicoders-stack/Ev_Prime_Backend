@@ -442,6 +442,12 @@ const getMyBookings = async (req, res) => {
     const stationIds = await _getPartnerStationIds(req.partner);
     const { status, dateFilter, startDate, endDate, limit = 50, page = 1 } = req.query;
     const filter = { station: { $in: stationIds } };
+    
+    // Sub-partners only see bookings created after their account was created
+    if (req.partner.isSubPartner) {
+      filter.createdAt = { $gte: req.partner.createdAt };
+    }
+
     if (status) {
       if (status === 'Ongoing') {
         filter.status = { $in: ['Confirmed', 'Ongoing', 'Charging'] };
@@ -467,10 +473,16 @@ const getMyBookings = async (req, res) => {
     }
 
     if (startDate && endDate) {
-      filter.createdAt = {
-        $gte: new Date(startDate),
-        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
-      };
+      const start = new Date(startDate);
+      const end = new Date(new Date(endDate).setHours(23, 59, 59, 999));
+      if (req.partner.isSubPartner) {
+        filter.createdAt = {
+          $gte: start > req.partner.createdAt ? start : req.partner.createdAt,
+          $lte: end
+        };
+      } else {
+        filter.createdAt = { $gte: start, $lte: end };
+      }
     }
 
     const bookings = await Booking.find(filter)
@@ -570,7 +582,25 @@ const getMyRevenue = async (req, res) => {
     const filterCurrent = { ...stationFilter };
     const filterPrev = { ...stationFilter };
     
+    // Sub-partners only see revenue after their creation
+    if (req.partner.isSubPartner) {
+      if (period === 'All Time') {
+        filterCurrent.createdAt = { $gte: req.partner.createdAt };
+      }
+    }
+    
     if (period !== 'All Time' && !(period === 'Custom' && !startDate)) {
+      if (req.partner.isSubPartner) {
+        // Ensure current period doesn't go before sub-partner creation
+        const currStart = currentPeriodFilter.$gte;
+        currentPeriodFilter.$gte = currStart && currStart > req.partner.createdAt 
+            ? currStart : req.partner.createdAt;
+            
+        if (previousPeriodFilter.$gte) {
+          const prevStart = previousPeriodFilter.$gte;
+          previousPeriodFilter.$gte = prevStart > req.partner.createdAt ? prevStart : req.partner.createdAt;
+        }
+      }
       filterCurrent.createdAt = currentPeriodFilter;
       if (period !== 'Custom') filterPrev.createdAt = previousPeriodFilter;
     }
@@ -666,15 +696,8 @@ const getMyRevenue = async (req, res) => {
 // @access  Partner
 const getMyDashboard = async (req, res) => {
   try {
-    const stations = await Station.find({
-      $or: [
-        { partner: req.partner.name },
-        { partnerId: req.partner._id },
-        { partner: req.partner._id.toString() },
-        { partner: req.partner.companyName }
-      ]
-    });
-    const stationIds = stations.map(s => s._id);
+    const stationIds = await _getPartnerStationIds(req.partner);
+    const stations = await Station.find({ _id: { $in: stationIds } });
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -706,6 +729,10 @@ const getMyDashboard = async (req, res) => {
     }
 
     const stationFilter = { station: { $in: stationIds } };
+    
+    if (req.partner.isSubPartner) {
+      stationFilter.createdAt = { $gte: req.partner.createdAt };
+    }
 
     const allBookings = await Booking.find(stationFilter);
     const todayBookings = allBookings.filter(b => new Date(b.createdAt) >= today);
