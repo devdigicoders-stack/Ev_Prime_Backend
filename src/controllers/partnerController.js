@@ -425,7 +425,7 @@ const getMyBookings = async (req, res) => {
       }
     }
 
-    if (dateFilter) {
+    if (dateFilter && dateFilter !== 'Custom') {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       if (dateFilter === 'Today') {
@@ -439,7 +439,10 @@ const getMyBookings = async (req, res) => {
         monthAgo.setMonth(monthAgo.getMonth() - 1);
         filter.createdAt = { $gte: monthAgo };
       }
-    } else if (startDate && endDate) {
+    }
+
+    // Custom date range filter (works with or without dateFilter='Custom')
+    if (startDate && endDate) {
       filter.createdAt = {
         $gte: new Date(startDate),
         $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
