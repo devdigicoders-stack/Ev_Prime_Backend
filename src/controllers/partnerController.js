@@ -467,7 +467,7 @@ const getMyBookings = async (req, res) => {
 // @access  Partner
 const getMyRevenue = async (req, res) => {
   try {
-    const { period = 'All Time' } = req.query;
+    const { period = 'All Time', startDate, endDate } = req.query;
     const stations = await Station.find({
       $or: [
         { partner: req.partner.name },
@@ -542,14 +542,21 @@ const getMyRevenue = async (req, res) => {
       previousPeriodFilter = { $gte: startOfLastMonth, $lt: startOfMonth };
       trendLabel = 'vs last month';
       prevLabel = 'Last Month';
+    } else if (period === 'Custom' && startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(new Date(endDate).setHours(23, 59, 59, 999));
+      currentPeriodFilter = { $gte: start, $lte: end };
+      previousPeriodFilter = {};
+      trendLabel = 'custom range';
+      prevLabel = 'Custom Range';
     }
 
     const filterCurrent = { ...stationFilter };
     const filterPrev = { ...stationFilter };
     
-    if (period !== 'All Time') {
+    if (period !== 'All Time' && !(period === 'Custom' && !startDate)) {
       filterCurrent.createdAt = currentPeriodFilter;
-      filterPrev.createdAt = previousPeriodFilter;
+      if (period !== 'Custom') filterPrev.createdAt = previousPeriodFilter;
     }
 
     const currentBookings = await Booking.find(filterCurrent);
