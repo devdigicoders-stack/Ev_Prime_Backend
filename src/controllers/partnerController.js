@@ -1777,6 +1777,7 @@ const getMyReviews = async (req, res) => {
 const getMyReports = async (req, res) => {
   try {
     const period = req.query.period || 'This Month';
+    const { startDate, endDate } = req.query;
     
     // Find stations linked to this partner
     const stations = await Station.find({
@@ -1809,6 +1810,11 @@ const getMyReports = async (req, res) => {
       const pastMonth = new Date();
       pastMonth.setDate(pastMonth.getDate() - 30);
       dateFilter = { $gte: pastMonth };
+    } else if (period === 'Custom' && startDate && endDate) {
+      dateFilter = {
+        $gte: new Date(startDate),
+        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
+      };
     }
 
     if (dateFilter) {
