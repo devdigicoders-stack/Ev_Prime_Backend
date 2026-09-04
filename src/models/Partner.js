@@ -60,14 +60,14 @@ const partnerSchema = new mongoose.Schema({
     name: String,
     email: String,
     profilePic: String,
-    role: { type: String, enum: ['Owner', 'Manager', 'Employee'], default: 'Employee' },
+    role: { type: String, default: 'Employee' },
     addedAt: { type: Date, default: Date.now }
   }],
 
   // Sub-Partner hierarchy
   isSubPartner: { type: Boolean, default: false },
   parentPartnerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Partner', default: null },
-  subPartnerRole: { type: String, enum: ['Manager', 'Operator', 'Viewer'], default: 'Manager' },
+  subPartnerRole: { type: String, default: 'Manager' },
   assignedStations: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Station' }],
   permissions: [{ type: String }],
 
