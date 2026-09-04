@@ -394,19 +394,19 @@ const resetPassword = async (req, res) => {
 // @access  Partner
 // ─── HELPER: resolve station IDs for partner or sub-partner ─────────────────
 const _getPartnerStationIds = async (partner) => {
-  if (partner.isSubPartner && partner.assignedStations && partner.assignedStations.length > 0) {
-    // Sub-partner: only their assigned stations
-    return partner.assignedStations.map(id => id);
+  if (partner.isSubPartner) {
+    if (partner.assignedStations && partner.assignedStations.length > 0) {
+      return partner.assignedStations.map(id => id);
+    }
+    return [];
   }
-  // Determine the effective name: if sub-partner with no stations, use parent's name
-  const effectiveName = partner.isSubPartner && partner.parentPartnerId
-    ? partner.parentPartnerId.name
-    : partner.name;
+  
+  const effectiveName = partner.name;
   const stations = await Station.find({
     $or: [
       { partner: effectiveName },
-      { partnerId: partner.isSubPartner ? partner.parentPartnerId?._id : partner._id },
-      { partner: (partner.isSubPartner ? partner.parentPartnerId?._id?.toString() : partner._id.toString()) },
+      { partnerId: partner._id },
+      { partner: partner._id.toString() },
       { partner: partner.companyName || '' }
     ]
   }).select('_id');

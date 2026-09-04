@@ -65,7 +65,7 @@ router.get('/me/stations', protectPartner, checkPermission('view_stations'), get
 router.post('/me/stations', protectPartner, checkPermission('manage_stations'), upload.single('image'), addMyStation);
 router.put('/me/stations/:id', protectPartner, checkPermission('manage_stations'), upload.single('image'), updateMyStation);
 router.get('/me/stations/:id/analytics', protectPartner, checkPermission('view_stations'), getStationAnalytics);
-router.get('/me/bookings', protectPartner, checkPermission('view_bookings'), getMyBookings);
+router.get('/me/bookings', protectPartner, checkPermission('manage_bookings'), getMyBookings);
 router.put('/me/bookings/:id/status', protectPartner, checkPermission('manage_bookings'), updateMyBookingStatus);
 router.put('/me/bookings/:id/start-charging', protectPartner, checkPermission('manage_sessions'), startChargingRemote);
 router.put('/me/bookings/:id/stop-charging', protectPartner, checkPermission('manage_sessions'), stopChargingRemote);
