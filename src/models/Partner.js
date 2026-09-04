@@ -63,6 +63,13 @@ const partnerSchema = new mongoose.Schema({
     role: { type: String, enum: ['Owner', 'Manager', 'Employee'], default: 'Employee' },
     addedAt: { type: Date, default: Date.now }
   }],
+
+  // Sub-Partner hierarchy
+  isSubPartner: { type: Boolean, default: false },
+  parentPartnerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Partner', default: null },
+  subPartnerRole: { type: String, enum: ['Manager', 'Operator', 'Viewer'], default: 'Manager' },
+  assignedStations: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Station' }],
+
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Admin'

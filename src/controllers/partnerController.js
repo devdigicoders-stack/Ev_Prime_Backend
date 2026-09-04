@@ -388,6 +388,27 @@ const resetPassword = async (req, res) => {
 // @desc    Partner: Get own profile
 // @route   GET /api/partner/me
 // @access  Partner
+// ─── HELPER: resolve station IDs for partner or sub-partner ─────────────────
+const _getPartnerStationIds = async (partner) => {
+  if (partner.isSubPartner && partner.assignedStations && partner.assignedStations.length > 0) {
+    // Sub-partner: only their assigned stations
+    return partner.assignedStations.map(id => id);
+  }
+  // Determine the effective name: if sub-partner with no stations, use parent's name
+  const effectiveName = partner.isSubPartner && partner.parentPartnerId
+    ? partner.parentPartnerId.name
+    : partner.name;
+  const stations = await Station.find({
+    $or: [
+      { partner: effectiveName },
+      { partnerId: partner.isSubPartner ? partner.parentPartnerId?._id : partner._id },
+      { partner: (partner.isSubPartner ? partner.parentPartnerId?._id?.toString() : partner._id.toString()) },
+      { partner: partner.companyName || '' }
+    ]
+  }).select('_id');
+  return stations.map(s => s._id);
+};
+
 const getMyProfile = async (req, res) => {
   try {
     res.json(req.partner);
@@ -401,7 +422,8 @@ const getMyProfile = async (req, res) => {
 // @access  Partner
 const getMyStations = async (req, res) => {
   try {
-    const stations = await Station.find({ partner: req.partner.name });
+    const stationIds = await _getPartnerStationIds(req.partner);
+    const stations = await Station.find({ _id: { $in: stationIds } });
     res.json({ success: true, data: stations });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -413,8 +435,7 @@ const getMyStations = async (req, res) => {
 // @access  Partner
 const getMyBookings = async (req, res) => {
   try {
-    const stations = await Station.find({ partner: req.partner.name });
-    const stationIds = stations.map(s => s._id);
+    const stationIds = await _getPartnerStationIds(req.partner);
     const { status, dateFilter, startDate, endDate, limit = 50, page = 1 } = req.query;
     const filter = { station: { $in: stationIds } };
     if (status) {
@@ -441,7 +462,6 @@ const getMyBookings = async (req, res) => {
       }
     }
 
-    // Custom date range filter (works with or without dateFilter='Custom')
     if (startDate && endDate) {
       filter.createdAt = {
         $gte: new Date(startDate),
@@ -468,15 +488,7 @@ const getMyBookings = async (req, res) => {
 const getMyRevenue = async (req, res) => {
   try {
     const { period = 'All Time', startDate, endDate } = req.query;
-    const stations = await Station.find({
-      $or: [
-        { partner: req.partner.name },
-        { partnerId: req.partner._id },
-        { partner: req.partner._id.toString() },
-        { partner: req.partner.companyName }
-      ]
-    });
-    const stationIds = stations.map(s => s._id);
+    const stationIds = await _getPartnerStationIds(req.partner);
 
     if (stationIds.length === 0) {
       return res.json({
@@ -1978,5 +1990,116 @@ module.exports = {
   getComplaintDetails,
   replyToComplaint,
   getMyReviews,
-  getMyReports
+  getMyReports,
+  getMySubPartners,
+  addSubPartner,
+  updateSubPartner,
+  removeSubPartner
 };
+
+// ─── SUB-PARTNER MANAGEMENT ──────────────────────────────────────────────────
+
+async function getMySubPartners(req, res) {
+  try {
+    if (req.partner.isSubPartner) {
+      return res.status(403).json({ success: false, message: 'Sub-partners cannot manage sub-partners.' });
+    }
+    const subPartners = await Partner.find({ parentPartnerId: req.partner._id, isSubPartner: true })
+      .select('-appPassword')
+      .populate('assignedStations', 'name city status');
+    res.json({ success: true, data: subPartners });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+async function addSubPartner(req, res) {
+  try {
+    if (req.partner.isSubPartner) {
+      return res.status(403).json({ success: false, message: 'Sub-partners cannot create sub-partners.' });
+    }
+    const { name, contactPerson, email, phone, appUsername, appPassword, subPartnerRole, assignedStations } = req.body;
+    if (!name || !appUsername || !appPassword) {
+      return res.status(400).json({ success: false, message: 'Name, username and password are required.' });
+    }
+    const effectiveEmail = email || `${appUsername}@subpartner.local`;
+    const effectivePhone = phone || req.partner.phone;
+    const effectiveContact = contactPerson || name;
+
+    const usernameExists = await Partner.findOne({ appUsername });
+    if (usernameExists) return res.status(400).json({ success: false, message: 'Username already taken.' });
+
+    const emailExists = await Partner.findOne({ email: effectiveEmail });
+    if (emailExists) return res.status(400).json({ success: false, message: 'Email already registered.' });
+
+    const hashedPassword = await bcrypt.hash(appPassword, 10);
+    const subPartner = await Partner.create({
+      name,
+      contactPerson: effectiveContact,
+      email: effectiveEmail,
+      phone: effectivePhone,
+      appUsername,
+      appPassword: hashedPassword,
+      hasCredentials: true,
+      status: 'Active',
+      isSubPartner: true,
+      parentPartnerId: req.partner._id,
+      subPartnerRole: subPartnerRole || 'Manager',
+      assignedStations: assignedStations || [],
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Sub-partner created successfully.',
+      data: {
+        _id: subPartner._id,
+        name: subPartner.name,
+        appUsername: subPartner.appUsername,
+        subPartnerRole: subPartner.subPartnerRole,
+        assignedStations: subPartner.assignedStations,
+        status: subPartner.status,
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+async function updateSubPartner(req, res) {
+  try {
+    if (req.partner.isSubPartner) {
+      return res.status(403).json({ success: false, message: 'Sub-partners cannot update sub-partners.' });
+    }
+    const sub = await Partner.findOne({ _id: req.params.id, parentPartnerId: req.partner._id, isSubPartner: true });
+    if (!sub) return res.status(404).json({ success: false, message: 'Sub-partner not found.' });
+
+    const { name, contactPerson, subPartnerRole, assignedStations, newPassword, status } = req.body;
+    if (name) sub.name = name;
+    if (contactPerson) sub.contactPerson = contactPerson;
+    if (subPartnerRole) sub.subPartnerRole = subPartnerRole;
+    if (assignedStations !== undefined) sub.assignedStations = assignedStations;
+    if (status) sub.status = status;
+    if (newPassword && newPassword.length >= 6) {
+      sub.appPassword = await bcrypt.hash(newPassword, 10);
+    }
+    await sub.save();
+    const updated = await Partner.findById(sub._id).select('-appPassword').populate('assignedStations', 'name city status');
+    res.json({ success: true, message: 'Sub-partner updated.', data: updated });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+async function removeSubPartner(req, res) {
+  try {
+    if (req.partner.isSubPartner) {
+      return res.status(403).json({ success: false, message: 'Sub-partners cannot delete sub-partners.' });
+    }
+    const sub = await Partner.findOne({ _id: req.params.id, parentPartnerId: req.partner._id, isSubPartner: true });
+    if (!sub) return res.status(404).json({ success: false, message: 'Sub-partner not found.' });
+    await sub.deleteOne();
+    res.json({ success: true, message: 'Sub-partner removed successfully.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}

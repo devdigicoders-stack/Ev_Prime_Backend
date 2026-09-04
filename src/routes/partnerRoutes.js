@@ -39,7 +39,11 @@ const {
   getComplaintDetails,
   replyToComplaint,
   getMyReviews,
-  getMyReports
+  getMyReports,
+  getMySubPartners,
+  addSubPartner,
+  updateSubPartner,
+  removeSubPartner
 } = require('../controllers/partnerController');
 const { protect, protectPartner } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
@@ -79,6 +83,12 @@ router.get('/me/staff', protectPartner, getMyStaff);
 router.post('/me/staff', protectPartner, upload.single('profilePic'), addMyStaff);
 router.put('/me/staff/:staffId', protectPartner, updateMyStaff);
 router.delete('/me/staff/:staffId', protectPartner, removeMyStaff);
+
+// Sub-Partners
+router.get('/me/sub-partners', protectPartner, getMySubPartners);
+router.post('/me/sub-partners', protectPartner, addSubPartner);
+router.put('/me/sub-partners/:id', protectPartner, updateSubPartner);
+router.delete('/me/sub-partners/:id', protectPartner, removeSubPartner);
 
 // Payouts & Transactions
 router.get('/me/payouts', protectPartner, getMyPayouts);

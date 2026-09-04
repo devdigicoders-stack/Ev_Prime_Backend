@@ -77,7 +77,9 @@ const protectPartner = async (req, res, next) => {
       const token = req.headers.authorization.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       if (decoded.type !== 'partner') return res.status(401).json({ message: 'Not authorized as partner' });
-      req.partner = await Partner.findById(decoded.id).select('-appPassword');
+      req.partner = await Partner.findById(decoded.id)
+        .select('-appPassword')
+        .populate('parentPartnerId', 'name _id');
       if (!req.partner) return res.status(401).json({ message: 'Partner not found' });
       if (req.partner.status === 'Blocked') return res.status(403).json({ message: 'Your account has been blocked. Contact admin.' });
       return next();
