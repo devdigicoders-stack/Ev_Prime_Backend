@@ -1864,19 +1864,18 @@ const getMyReports = async (req, res) => {
     const { startDate, endDate } = req.query;
     
     // Find stations linked to this partner
-    const stations = await Station.find({
-      $or: [
-        { partner: req.partner.name },
-        { partnerId: req.partner._id },
-        { partner: req.partner._id.toString() },
-        { partner: req.partner.companyName }
-      ]
-    });
-    const stationIds = stations.map(s => s._id);
+    const stationIds = await _getPartnerStationIds(req.partner);
 
     let query = {};
     if (stationIds.length > 0) {
       query.station = { $in: stationIds };
+    } else {
+      return res.json({
+        success: true,
+        summary: { totalRevenue: 0, totalBookings: 0, totalEnergy: 0, carbonSaved: 0, period },
+        mostUsedStations: [],
+        data: []
+      });
     }
 
     const now = new Date();
@@ -1902,7 +1901,14 @@ const getMyReports = async (req, res) => {
     }
 
     if (dateFilter) {
+      if (req.partner.isSubPartner) {
+        const currStart = dateFilter.$gte;
+        dateFilter.$gte = currStart && currStart > req.partner.createdAt 
+            ? currStart : req.partner.createdAt;
+      }
       query.createdAt = dateFilter;
+    } else if (req.partner.isSubPartner) {
+      query.createdAt = { $gte: req.partner.createdAt };
     }
 
     const bookings = await Booking.find(query)
