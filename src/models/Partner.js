@@ -69,6 +69,7 @@ const partnerSchema = new mongoose.Schema({
   parentPartnerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Partner', default: null },
   subPartnerRole: { type: String, enum: ['Manager', 'Operator', 'Viewer'], default: 'Manager' },
   assignedStations: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Station' }],
+  permissions: [{ type: String }],
 
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,

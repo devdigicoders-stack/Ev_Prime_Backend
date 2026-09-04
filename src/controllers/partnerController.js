@@ -285,6 +285,8 @@ const partnerLogin = async (req, res) => {
       phone: partner.phone,
       appUsername: partner.appUsername,
       status: partner.status,
+      isSubPartner: partner.isSubPartner || false,
+      permissions: partner.permissions || [],
       token,
     });
   } catch (error) {
@@ -2018,7 +2020,7 @@ async function addSubPartner(req, res) {
     if (req.partner.isSubPartner) {
       return res.status(403).json({ success: false, message: 'Sub-partners cannot create sub-partners.' });
     }
-    const { name, contactPerson, email, phone, appUsername, appPassword, subPartnerRole, assignedStations } = req.body;
+    const { name, contactPerson, email, phone, appUsername, appPassword, subPartnerRole, assignedStations, permissions } = req.body;
     if (!name || !appUsername || !appPassword) {
       return res.status(400).json({ success: false, message: 'Name, username and password are required.' });
     }
@@ -2046,6 +2048,7 @@ async function addSubPartner(req, res) {
       parentPartnerId: req.partner._id,
       subPartnerRole: subPartnerRole || 'Manager',
       assignedStations: assignedStations || [],
+      permissions: permissions || [],
     });
 
     res.status(201).json({
@@ -2057,6 +2060,7 @@ async function addSubPartner(req, res) {
         appUsername: subPartner.appUsername,
         subPartnerRole: subPartner.subPartnerRole,
         assignedStations: subPartner.assignedStations,
+        permissions: subPartner.permissions,
         status: subPartner.status,
       }
     });
@@ -2073,11 +2077,12 @@ async function updateSubPartner(req, res) {
     const sub = await Partner.findOne({ _id: req.params.id, parentPartnerId: req.partner._id, isSubPartner: true });
     if (!sub) return res.status(404).json({ success: false, message: 'Sub-partner not found.' });
 
-    const { name, contactPerson, subPartnerRole, assignedStations, newPassword, status } = req.body;
+    const { name, contactPerson, subPartnerRole, assignedStations, permissions, newPassword, status } = req.body;
     if (name) sub.name = name;
     if (contactPerson) sub.contactPerson = contactPerson;
     if (subPartnerRole) sub.subPartnerRole = subPartnerRole;
     if (assignedStations !== undefined) sub.assignedStations = assignedStations;
+    if (permissions !== undefined) sub.permissions = permissions;
     if (status) sub.status = status;
     if (newPassword && newPassword.length >= 6) {
       sub.appPassword = await bcrypt.hash(newPassword, 10);
