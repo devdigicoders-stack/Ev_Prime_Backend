@@ -277,7 +277,7 @@ const partnerLogin = async (req, res) => {
 
     const token = jwt.sign({ id: partner._id, type: 'partner' }, process.env.JWT_SECRET, { expiresIn: '30d' });
 
-    res.json({
+    const responseData = {
       _id: partner._id,
       name: partner.name,
       contactPerson: partner.contactPerson,
@@ -285,10 +285,12 @@ const partnerLogin = async (req, res) => {
       phone: partner.phone,
       appUsername: partner.appUsername,
       status: partner.status,
-      isSubPartner: partner.isSubPartner || false,
+      isSubPartner: partner.isSubPartner === true,
       permissions: partner.permissions || [],
       token,
-    });
+    };
+    console.log('Login Response:', responseData);
+    res.json(responseData);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
