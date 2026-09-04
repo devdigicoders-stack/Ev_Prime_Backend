@@ -1288,7 +1288,33 @@ const updateMyStaff = async (req, res) => {
 // Payouts
 const getMyPayouts = async (req, res) => {
   try {
-    const payouts = await PartnerPayout.find({ partner: req.partner.id }).sort('-createdAt');
+    const { period, startDate, endDate } = req.query;
+    let filter = { partner: req.partner.id };
+
+    if (period) {
+      if (period === 'Today') {
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+        filter.createdAt = { $gte: start };
+      } else if (period === 'This Week') {
+        const start = new Date();
+        start.setDate(start.getDate() - 7);
+        filter.createdAt = { $gte: start };
+      } else if (period === 'This Month') {
+        const start = new Date();
+        start.setDate(start.getDate() - 30);
+        filter.createdAt = { $gte: start };
+      }
+    }
+
+    if (startDate && endDate) {
+      filter.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
+      };
+    }
+
+    const payouts = await PartnerPayout.find(filter).sort('-createdAt');
     res.json({ success: true, data: payouts });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
