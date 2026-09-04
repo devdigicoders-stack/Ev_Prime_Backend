@@ -1,13 +1,11 @@
-const mongoose = require('mongoose');
 require('dotenv').config();
-mongoose.connect(process.env.MONGO_URI).then(async () => {
-  const Partner = require('./src/models/Partner');
-  const p = await Partner.find();
-  console.log(JSON.stringify(p.map(x => ({
-    name: x.name, 
-    isSubPartner: x.isSubPartner, 
-    permissions: x.permissions,
-    appUsername: x.appUsername
-  })), null, 2));
-  process.exit();
+const mongoose = require('mongoose');
+const Partner = require('./src/models/Partner');
+
+mongoose.connect(process.env.MONGO_URI || 'mongodb+srv://developer:developer@cluster0.o5hzh.mongodb.net/ev-prime?retryWrites=true&w=majority').then(async () => {
+  const allPartners = await Partner.find({}).sort({createdAt: -1}).limit(5);
+  allPartners.forEach(p => {
+    console.log(p.name, '| isSubPartner:', p.isSubPartner, '| assignedStations:', p.assignedStations?.length, '| role:', p.subPartnerRole);
+  });
+  process.exit(0);
 });
