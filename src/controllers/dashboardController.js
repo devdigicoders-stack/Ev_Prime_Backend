@@ -207,7 +207,7 @@ const getDashboardData = async (req, res) => {
       {
         $group: {
           _id: { $dateToString: { format: "%d %b", date: "$createdAt" } },
-          value: { $sum: "$estimatedEnergy" }
+          value: { $sum: { $ifNull: ["$unitsConsumed", "$estimatedEnergy"] } }
         }
       }
     ]);
