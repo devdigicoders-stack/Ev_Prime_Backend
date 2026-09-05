@@ -563,7 +563,7 @@ const getMyRevenue = async (req, res) => {
       previousPeriodFilter = { $gte: dayBefore, $lt: yesterday };
       trendLabel = 'vs day before';
       prevLabel = 'Day Before';
-    } else if (period === 'This Week') {
+    } else if (period === 'This Week' || period === 'Week') {
       const startOfWeek = new Date(today);
       startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
       const startOfLastWeek = new Date(startOfWeek);
@@ -573,7 +573,7 @@ const getMyRevenue = async (req, res) => {
       previousPeriodFilter = { $gte: startOfLastWeek, $lt: startOfWeek };
       trendLabel = 'vs last week';
       prevLabel = 'Last Week';
-    } else if (period === 'This Month') {
+    } else if (period === 'This Month' || period === 'Month') {
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       
