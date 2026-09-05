@@ -21,6 +21,8 @@ const calculateGrowth = (current, previous) => {
 const getDashboardData = async (req, res) => {
   try {
     const now = new Date();
+    const revenueDays = parseInt(req.query.revenueDays) || 14;
+    const energyDays  = parseInt(req.query.energyDays)  || 30;
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(now.getDate() - 30);
     const sixtyDaysAgo = new Date();
@@ -164,16 +166,16 @@ const getDashboardData = async (req, res) => {
       mapData
     };
 
-    // 3. Revenue Overview Data (Line Chart - Last 14 days)
-    const fourteenDaysAgo = new Date();
-    fourteenDaysAgo.setDate(now.getDate() - 13);
-    fourteenDaysAgo.setHours(0,0,0,0);
+    // 3. Revenue Overview Data (Line Chart - Dynamic period)
+    const revenueStartDate = new Date();
+    revenueStartDate.setDate(now.getDate() - (revenueDays - 1));
+    revenueStartDate.setHours(0,0,0,0);
 
     const dailyRevenue = await Booking.aggregate([
       { 
         $match: { 
           ...bookingMatch,
-          createdAt: { $gte: fourteenDaysAgo }
+          createdAt: { $gte: revenueStartDate }
         } 
       },
       {
@@ -185,7 +187,7 @@ const getDashboardData = async (req, res) => {
     ]);
 
     const revenueData = [];
-    for (let i = 13; i >= 0; i--) {
+    for (let i = revenueDays - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const name = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
@@ -193,15 +195,16 @@ const getDashboardData = async (req, res) => {
       revenueData.push({ name, value: record ? record.value : 0 });
     }
 
-    // 4. Energy Consumption Data (Bar Chart - Last 30 days)
-    const thirtyDaysAgoStart = new Date(thirtyDaysAgo);
-    thirtyDaysAgoStart.setHours(0,0,0,0);
+    // 4. Energy Consumption Data (Bar Chart - Dynamic period)
+    const energyStartDate = new Date();
+    energyStartDate.setDate(now.getDate() - (energyDays - 1));
+    energyStartDate.setHours(0,0,0,0);
 
     const dailyEnergy = await Booking.aggregate([
       { 
         $match: { 
           ...bookingPaidMatch,
-          createdAt: { $gte: thirtyDaysAgoStart }
+          createdAt: { $gte: energyStartDate }
         } 
       },
       {
@@ -213,10 +216,11 @@ const getDashboardData = async (req, res) => {
     ]);
 
     const energyData = [];
-    for (let i = 29; i >= 0; i--) {
+    for (let i = energyDays - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const name = i % 5 === 0 ? d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '';
+      const labelInterval = energyDays <= 14 ? 1 : energyDays <= 30 ? 5 : 10;
+      const name = i % labelInterval === 0 ? d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '';
       const exactDateString = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
       const record = dailyEnergy.find(r => r._id === exactDateString);
       energyData.push({ name, value: record ? Math.floor(record.value) : 0 });

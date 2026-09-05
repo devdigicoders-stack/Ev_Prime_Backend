@@ -1381,20 +1381,29 @@ const getMyPayouts = async (req, res) => {
 
 const requestPayout = async (req, res) => {
   try {
+    const partner = await Partner.findById(req.partner.id);
+    let bankDetails = req.body.bankDetails;
+    if ((!bankDetails || !bankDetails.accountNumber) && partner && partner.bankDetails && partner.bankDetails.accountNumber) {
+      bankDetails = partner.bankDetails;
+    }
+
     const payout = await PartnerPayout.create({
       partner: req.partner.id,
       amount: req.body.amount,
-      bankDetails: req.body.bankDetails,
+      bankDetails: bankDetails,
     });
     
-    const partner = await Partner.findById(req.partner.id);
     if (partner) {
-      await notificationService.sendToAllAdmins(
-        'New Payout Request 💰',
-        `Partner ${partner.name} has requested a withdrawal of ₹${req.body.amount}`,
-        { type: 'payout', payoutId: payout._id.toString() },
-        'alert'
-      );
+      try {
+        await notificationService.sendToAllAdmins(
+          'New Payout Request 💰',
+          `Partner ${partner.name} has requested a withdrawal of ₹${req.body.amount}`,
+          { type: 'payout', payoutId: payout._id.toString() },
+          'alert'
+        );
+      } catch (notifErr) {
+        console.error('Admin notification failed:', notifErr.message);
+      }
     }
     
     res.json({ success: true, message: 'Payout requested successfully', data: payout });

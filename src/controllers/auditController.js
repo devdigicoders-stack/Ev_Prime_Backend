@@ -5,7 +5,7 @@ const AuditLog = require('../models/AuditLog');
 // @access  Admin
 const getAuditLogs = async (req, res) => {
   try {
-    const { search, module, dateFilter, page = 1, limit = 10 } = req.query;
+    const { search, module, dateFilter, startDate, endDate, page = 1, limit = 10 } = req.query;
 
     let query = {};
 
@@ -13,44 +13,79 @@ const getAuditLogs = async (req, res) => {
       query.user = req.admin.name;
     }
 
-    // Search filter (User, Action, or Details)
-    if (search) {
+    // Search filter across User, Role, Action, Module, Details, and IP Address
+    if (search && search.trim()) {
+      const s = search.trim();
       query.$and = query.$and || [];
       query.$and.push({
         $or: [
-          { user: { $regex: search, $options: 'i' } },
-          { action: { $regex: search, $options: 'i' } },
-          { details: { $regex: search, $options: 'i' } },
+          { user: { $regex: s, $options: 'i' } },
+          { role: { $regex: s, $options: 'i' } },
+          { action: { $regex: s, $options: 'i' } },
+          { module: { $regex: s, $options: 'i' } },
+          { details: { $regex: s, $options: 'i' } },
+          { ip: { $regex: s, $options: 'i' } },
         ]
       });
     }
 
-    // Module filter
+    // Module filter (case-insensitive exact match)
     if (module && module !== 'All Modules') {
-      query.module = module;
+      query.module = { $regex: new RegExp(`^${module.trim()}$`, 'i') };
     }
 
-    // Date filter
-    if (dateFilter) {
-      const now = new Date();
-      let startDate = new Date();
-      
-      switch (dateFilter) {
-        case 'Today':
-          startDate.setHours(0, 0, 0, 0);
-          break;
-        case 'This Week':
-          startDate.setDate(now.getDate() - 7);
-          break;
-        case 'This Month':
-          startDate.setMonth(now.getMonth() - 1);
-          break;
-        default:
-          startDate = null;
-      }
-      
+    // Date range filter
+    if (startDate || endDate) {
+      query.createdAt = {};
       if (startDate) {
-        query.createdAt = { $gte: startDate };
+        const s = new Date(startDate);
+        s.setHours(0, 0, 0, 0);
+        query.createdAt.$gte = s;
+      }
+      if (endDate) {
+        const e = new Date(endDate);
+        e.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = e;
+      }
+    } else if (dateFilter && dateFilter !== 'All Time') {
+      const now = new Date();
+      let start = new Date(now);
+      let end = new Date(now);
+
+      switch (dateFilter) {
+        case 'Today': {
+          start.setHours(0, 0, 0, 0);
+          end.setHours(23, 59, 59, 999);
+          query.createdAt = { $gte: start, $lte: end };
+          break;
+        }
+        case 'Yesterday': {
+          start.setDate(now.getDate() - 1);
+          start.setHours(0, 0, 0, 0);
+          end.setDate(now.getDate() - 1);
+          end.setHours(23, 59, 59, 999);
+          query.createdAt = { $gte: start, $lte: end };
+          break;
+        }
+        case 'This Week': {
+          start.setDate(now.getDate() - 7);
+          start.setHours(0, 0, 0, 0);
+          query.createdAt = { $gte: start };
+          break;
+        }
+        case 'This Month': {
+          start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+          query.createdAt = { $gte: start };
+          break;
+        }
+        case 'Last 30 Days': {
+          start.setDate(now.getDate() - 30);
+          start.setHours(0, 0, 0, 0);
+          query.createdAt = { $gte: start };
+          break;
+        }
+        default:
+          break;
       }
     }
 
@@ -75,16 +110,48 @@ const getAuditLogs = async (req, res) => {
   }
 };
 
+// Helper to extract real public or network IP of the caller
+const getRealClientIp = (req) => {
+  if (!req) return '127.0.0.1';
+  const forwarded = req.headers ? req.headers['x-forwarded-for'] : null;
+  if (forwarded) {
+    const firstIp = forwarded.split(',')[0].trim().replace(/^::ffff:/, '');
+    if (firstIp) return firstIp;
+  }
+  const cfIp = req.headers ? req.headers['cf-connecting-ip'] : null;
+  if (cfIp) return cfIp.trim();
+  const realIp = req.headers ? req.headers['x-real-ip'] : null;
+  if (realIp) return realIp.trim();
+
+  let raw = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || '127.0.0.1';
+  raw = raw.replace(/^::ffff:/, '');
+  if (raw === '::1' || raw === '127.0.0.1') {
+    return '127.0.0.1';
+  }
+  return raw;
+};
+
 // Internal Helper for other controllers to use
-const createAuditLog = async ({ user, role, action, module, details, ip }) => {
+const createAuditLog = async ({ user, role, action, module, details, ip, req }) => {
   try {
+    let resolvedIp = ip;
+    if (!resolvedIp && req) {
+      resolvedIp = getRealClientIp(req);
+    }
+    if (resolvedIp) {
+      resolvedIp = resolvedIp.replace(/^::ffff:/, '');
+      if (resolvedIp === '::1') resolvedIp = '127.0.0.1';
+    } else {
+      resolvedIp = '127.0.0.1';
+    }
+
     await AuditLog.create({
-      user,
-      role,
+      user: user || 'Admin',
+      role: role || 'System Administrator',
       action,
       module,
       details,
-      ip
+      ip: resolvedIp
     });
   } catch (error) {
     console.error('Failed to create audit log', error);
@@ -93,5 +160,6 @@ const createAuditLog = async ({ user, role, action, module, details, ip }) => {
 
 module.exports = {
   getAuditLogs,
-  createAuditLog
+  createAuditLog,
+  getRealClientIp
 };

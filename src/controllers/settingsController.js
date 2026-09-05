@@ -47,14 +47,46 @@ const updateSettings = async (req, res) => {
 const updateBilling = async (req, res) => {
   try {
     const adminId = req.admin._id;
-    const updateData = req.body;
+    const {
+      planName,
+      planPrice,
+      paymentMethodType,
+      paymentMethodLast4,
+      paymentMethodExpiry,
+      billingHistory,
+      addInvoice
+    } = req.body;
 
-    const billing = await AdminBilling.findOneAndUpdate(
-      { adminId },
-      { $set: updateData },
-      { new: true, upsert: true }
-    );
+    let billing = await AdminBilling.findOne({ adminId });
+    if (!billing) {
+      billing = new AdminBilling({ adminId });
+    }
 
+    if (planName) billing.planName = planName;
+    if (planPrice !== undefined) billing.planPrice = Number(planPrice);
+    if (paymentMethodType) billing.paymentMethodType = paymentMethodType;
+    if (paymentMethodLast4) billing.paymentMethodLast4 = paymentMethodLast4;
+    if (paymentMethodExpiry) billing.paymentMethodExpiry = paymentMethodExpiry;
+
+    if (Array.isArray(billingHistory)) {
+      billing.billingHistory = billingHistory;
+    }
+
+    if (addInvoice) {
+      billing.billingHistory.unshift({
+        date: new Date(),
+        amount: billing.planPrice,
+        status: 'Paid'
+      });
+    }
+
+    for (const key of Object.keys(req.body)) {
+      if (!['planName', 'planPrice', 'paymentMethodType', 'paymentMethodLast4', 'paymentMethodExpiry', 'billingHistory', 'addInvoice'].includes(key)) {
+        billing[key] = req.body[key];
+      }
+    }
+
+    await billing.save();
     res.json(billing);
   } catch (error) {
     res.status(500).json({ message: error.message });

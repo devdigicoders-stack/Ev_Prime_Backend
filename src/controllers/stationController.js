@@ -1,4 +1,6 @@
+const mongoose = require('mongoose');
 const Station = require('../models/Station');
+const Partner = require('../models/Partner');
 const notificationService = require('../services/notificationService');
 
 // @desc    Create a new station
@@ -6,7 +8,11 @@ const notificationService = require('../services/notificationService');
 // @access  Private (Admin)
 const createStation = async (req, res) => {
   try {
-    const { name, location, city, address, latitude, longitude, powerCapacity, connectors, partner, status, connectorTypes, amenities, openHours } = req.body;
+    const {
+      name, location, city, state, address, latitude, longitude,
+      powerCapacity, connectors, partner, status, connectorTypes,
+      amenities, openHours
+    } = req.body;
 
     if (!name || !location || !city || !connectors || !partner) {
       return res.status(400).json({ message: 'Please provide all required fields (name, location, city, connectors, partner)' });
@@ -21,7 +27,7 @@ const createStation = async (req, res) => {
     }
 
     const stationData = {
-      name, location, city, address, latitude, longitude,
+      name, location, city, state: state || req.body.state, address, latitude, longitude,
       powerCapacity, connectors, partner,
       status: status || 'Active',
       connectorTypes: parsedConnectorTypes,
@@ -54,15 +60,40 @@ const createStation = async (req, res) => {
 
 // @desc    Get all stations
 // @route   GET /api/station
-// @access  Private (Admin)
+// @access  Public / Private (Admin)
 const getAllStations = async (req, res) => {
   try {
     let query = {};
     if (req.admin && req.admin.adminType === 'subadmin') {
       query.createdBy = req.admin._id;
     }
-    const stations = await Station.find(query).sort({ createdAt: -1 });
-    res.json(stations);
+    const stations = await Station.find(query).sort({ createdAt: -1 }).lean();
+
+    // Resolve partner names if partner field is an ObjectId
+    const partnerIds = stations
+      .map(s => s.partner)
+      .filter(p => p && mongoose.Types.ObjectId.isValid(p));
+
+    const partners = await Partner.find({ _id: { $in: partnerIds } }, 'name').lean();
+    const partnerMap = {};
+    partners.forEach(p => {
+      partnerMap[p._id.toString()] = p.name;
+    });
+
+    const formattedStations = stations.map(s => {
+      let partnerDisplayName = s.partner;
+      if (s.partner && partnerMap[s.partner.toString()]) {
+        partnerDisplayName = partnerMap[s.partner.toString()];
+      } else if (s.partner && mongoose.Types.ObjectId.isValid(s.partner)) {
+        partnerDisplayName = 'Bharat EV Partner';
+      }
+      return {
+        ...s,
+        partner: partnerDisplayName || 'Bharat EV Prime'
+      };
+    });
+
+    res.json(formattedStations);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

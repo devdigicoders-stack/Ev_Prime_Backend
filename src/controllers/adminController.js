@@ -8,6 +8,8 @@ const PartnerPayout = require('../models/PartnerPayout');
 const PartnerComplaint = require('../models/PartnerComplaint');
 const notificationService = require('../services/notificationService');
 const mongoose = require('mongoose');
+const AdminSession = require('../models/AdminSession');
+const { createAuditLog } = require('./auditController');
 
 // Generate JWT
 const generateToken = (id) => {
@@ -61,8 +63,49 @@ const loginAdmin = async (req, res) => {
 
     if (admin && (await admin.matchPassword(password))) {
       if (!admin.isActive) {
+        createAuditLog({
+          user: admin.name || 'Admin',
+          role: admin.adminType === 'superadmin' ? 'Super Admin' : 'Sub Admin',
+          action: 'Failed Login',
+          module: 'Authentication',
+          details: `Login rejected: Account ${admin.email} is deactivated.`,
+          req
+        });
         return res.status(403).json({ message: 'Your account has been deactivated. Contact super admin.' });
       }
+
+      createAuditLog({
+        user: admin.name || 'Admin',
+        role: admin.adminType === 'superadmin' ? 'Super Admin' : 'Sub Admin',
+        action: 'Logged In',
+        module: 'Authentication',
+        details: `Admin ${admin.name || admin.email} logged in successfully.`,
+        req
+      });
+
+      // Track live session in AdminSession collection
+      try {
+        const ua = req.headers['user-agent'] || '';
+        let dev = 'Chrome Browser';
+        if (ua.includes('Macintosh') || ua.includes('Mac OS')) dev = 'MacBook Pro • Chrome';
+        else if (ua.includes('Windows')) dev = 'Windows PC • Chrome';
+        else if (ua.includes('iPhone') || ua.includes('Android')) dev = 'Mobile Device';
+
+        // Mark other sessions of this admin as inactive/false
+        await AdminSession.updateMany({ adminName: admin.name || admin.email }, { $set: { isCurrent: false } });
+
+        await AdminSession.create({
+          adminName: admin.name || 'Admin User',
+          device: dev,
+          location: 'New Delhi, IN',
+          status: 'Active Now',
+          isCurrent: true,
+          lastActive: new Date()
+        });
+      } catch (sessErr) {
+        console.error('Session tracking error:', sessErr.message);
+      }
+
       res.json({
         _id: admin._id,
         name: admin.name,
@@ -72,6 +115,14 @@ const loginAdmin = async (req, res) => {
         token: generateToken(admin._id),
       });
     } else {
+      createAuditLog({
+        user: email || 'Unknown User',
+        role: 'Unknown',
+        action: 'Failed Login',
+        module: 'Authentication',
+        details: `Invalid credentials entered for email: ${email || 'none'}`,
+        req
+      });
       res.status(401).json({ message: 'Invalid email or password' });
     }
   } catch (error) {
@@ -326,8 +377,21 @@ const markNotificationsRead = async (req, res) => {
 
 const getAllPayouts = async (req, res) => {
   try {
-    const payouts = await PartnerPayout.find().populate('partner', 'name email phone').sort('-createdAt');
-    res.json({ success: true, data: payouts });
+    const payouts = await PartnerPayout.find()
+      .populate('partner', 'name email phone bankDetails businessAddress gstNumber')
+      .sort('-createdAt');
+
+    const formattedPayouts = payouts.map(p => {
+      const doc = p.toObject();
+      if (!doc.bankDetails || !doc.bankDetails.accountNumber) {
+        if (doc.partner && doc.partner.bankDetails && doc.partner.bankDetails.accountNumber) {
+          doc.bankDetails = doc.partner.bankDetails;
+        }
+      }
+      return doc;
+    });
+
+    res.json({ success: true, data: formattedPayouts });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -335,27 +399,38 @@ const getAllPayouts = async (req, res) => {
 
 const updatePayoutStatus = async (req, res) => {
   try {
-    const { status, remarks } = req.body; // status can be 'Approved' or 'Rejected'
+    const { status, remarks, transactionId } = req.body; // status can be 'Completed' or 'Rejected'
     const payout = await PartnerPayout.findById(req.params.id);
     if (!payout) return res.status(404).json({ success: false, message: 'Payout request not found' });
     
     payout.status = status;
     if (remarks) payout.remarks = remarks;
+    if (transactionId) payout.transactionId = transactionId;
+    if (status === 'Completed') {
+      payout.processedAt = new Date();
+      if (!payout.transactionId) {
+        payout.transactionId = 'TXN-' + Math.floor(10000000 + Math.random() * 90000000);
+      }
+    }
     await payout.save();
     
     // Notify Partner
-    const title = status === 'Completed' ? 'Payout Processed' : 'Payout Rejected ❌';
-    const body = status === 'Completed' ? `₹${payout.amount} transferred to your bank account.` : `Your withdrawal request for ₹${payout.amount} was rejected. ${remarks ? `Reason: ${remarks}` : ''}`;
+    try {
+      const title = status === 'Completed' ? 'Payout Processed' : 'Payout Rejected ❌';
+      const body = status === 'Completed' ? `₹${payout.amount} transferred to your bank account.` : `Your withdrawal request for ₹${payout.amount} was rejected. ${remarks ? `Reason: ${remarks}` : ''}`;
+      
+      await notificationService.sendToPartner(
+        payout.partner.toString(),
+        title,
+        body,
+        { payoutId: payout._id.toString() },
+        'payout'
+      );
+    } catch (notifErr) {
+      console.error('Payout notification failed:', notifErr.message);
+    }
     
-    await notificationService.sendToPartner(
-      payout.partner.toString(),
-      title,
-      body,
-      { payoutId: payout._id.toString() },
-      'payout'
-    );
-    
-    res.json({ success: true, message: `Payout request ${status}`, data: payout });
+    res.json({ success: true, message: `Payout request marked as ${status}`, data: payout });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

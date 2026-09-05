@@ -7,26 +7,42 @@ const mongoose = require('mongoose');
 // @access  Admin
 const getCarbonData = async (req, res) => {
   try {
-    const range = req.query.range || '30d';
+    const range = req.query.range || 'all';
     let dateFilter = {};
+    let trendDays = 90;
 
-    if (range !== 'all') {
+    if (range === 'custom' && req.query.from && req.query.to) {
+      const fromDate = new Date(req.query.from);
+      fromDate.setHours(0, 0, 0, 0);
+      const toDate = new Date(req.query.to);
+      toDate.setHours(23, 59, 59, 999);
+      dateFilter = { createdAt: { $gte: fromDate, $lte: toDate } };
+      // trendDays = diff in days between from and to
+      trendDays = Math.ceil((toDate - fromDate) / (1000 * 60 * 60 * 24));
+    } else if (range !== 'all') {
       const days = parseInt(range.replace('d', ''));
+      trendDays = days;
       const pastDate = new Date();
       pastDate.setDate(pastDate.getDate() - days);
       dateFilter = { createdAt: { $gte: pastDate } };
+    } else {
+      trendDays = 90;
     }
 
-    // 1. Aggregate real carbon data from completed bookings
+    // 1. Aggregate carbon data from completed bookings
+    // carbonSavedKg may be 0 in DB, so fallback to estimatedEnergy-based calculation
+    // EV average: 1 kWh ≈ 0.7 kg CO2 saved vs petrol car
+    //             1 kWh ≈ 0.09 liters fuel equivalent
+    //             1 tree absorbs ≈ 21 kg CO2/year → 0.057 kg/day
     const agg = await Booking.aggregate([
-      { $match: { status: 'Completed', ...dateFilter } },
+      { $match: { status: { $in: ['Completed', 'Confirmed'] }, ...dateFilter } },
       {
         $group: {
           _id: null,
-          totalCarbonKg: { $sum: '$carbonSavedKg' },
-          totalFuelLiters: { $sum: '$fuelSavedLiters' },
-          totalEnergyKwh: { $sum: '$estimatedEnergy' },
-          totalTrees: { $sum: '$treesEquivalent' },
+          totalCarbonKg:  { $sum: { $cond: [{ $gt: ['$carbonSavedKg', 0] }, '$carbonSavedKg', { $multiply: ['$estimatedEnergy', 0.7] }] } },
+          totalFuelLiters:{ $sum: { $cond: [{ $gt: ['$fuelSavedLiters', 0] }, '$fuelSavedLiters', { $multiply: ['$estimatedEnergy', 0.09] }] } },
+          totalEnergyKwh: { $sum: { $ifNull: ['$estimatedEnergy', 0] } },
+          totalTrees:     { $sum: { $cond: [{ $gt: ['$treesEquivalent', 0] }, '$treesEquivalent', { $divide: [{ $multiply: ['$estimatedEnergy', 0.7] }, 21] }] } },
         }
       }
     ]);
@@ -34,35 +50,53 @@ const getCarbonData = async (req, res) => {
     const totals = agg[0] || { totalCarbonKg: 0, totalFuelLiters: 0, totalEnergyKwh: 0, totalTrees: 0 };
 
     const stats = {
-      co2Saved: (totals.totalCarbonKg / 1000).toFixed(2),         // Tons
-      co2AvoidedKg: Math.round(totals.totalCarbonKg).toLocaleString(),
+      co2Saved:        (totals.totalCarbonKg / 1000).toFixed(2),
+      co2AvoidedKg:    Math.round(totals.totalCarbonKg).toLocaleString(),
       treesEquivalent: Math.round(totals.totalTrees).toLocaleString(),
-      fuelSaved: Math.round(totals.totalFuelLiters).toLocaleString(),
+      fuelSaved:       Math.round(totals.totalFuelLiters).toLocaleString(),
       energyGenerated: Math.round(totals.totalEnergyKwh).toLocaleString(),
     };
 
-    // 2. Trend data — daily CO2 saved for last 15 days
+    // 2. Trend data — daily CO2 for selected range
+    const trendStart = new Date();
+    trendStart.setDate(trendStart.getDate() - (trendDays - 1));
+    trendStart.setHours(0, 0, 0, 0);
+
     const trendAgg = await Booking.aggregate([
       {
         $match: {
-          status: 'Completed',
-          createdAt: { $gte: (() => { const d = new Date(); d.setDate(d.getDate() - 15); return d; })() }
+          status: { $in: ['Completed', 'Confirmed'] },
+          createdAt: { $gte: trendStart }
         }
       },
       {
         $group: {
           _id: { $dateToString: { format: '%d %b', date: '$createdAt' } },
-          value: { $sum: '$carbonSavedKg' }
+          carbonKg: { $sum: { $cond: [{ $gt: ['$carbonSavedKg', 0] }, '$carbonSavedKg', { $multiply: ['$estimatedEnergy', 0.7] }] } }
         }
       },
       { $sort: { '_id': 1 } }
     ]);
 
-    const trendData = trendAgg.map(t => ({ name: t._id, value: Math.round(t.value) }));
+    // Build a full daily array with 0 for missing days
+    const trendMap = {};
+    trendAgg.forEach(t => { trendMap[t._id] = Math.round(t.carbonKg); });
+
+    const trendData = [];
+    for (let i = trendDays - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const label = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+      trendData.push({
+        date: label,
+        index: trendDays - 1 - i,
+        value: trendMap[label] || 0
+      });
+    }
 
     // 3. City donut chart — carbon by city
     const cityAgg = await Booking.aggregate([
-      { $match: { status: 'Completed', ...dateFilter } },
+      { $match: { status: { $in: ['Completed', 'Confirmed'] }, ...dateFilter } },
       {
         $lookup: {
           from: 'stations',
@@ -75,7 +109,7 @@ const getCarbonData = async (req, res) => {
       {
         $group: {
           _id: '$stationData.city',
-          carbonKg: { $sum: '$carbonSavedKg' }
+          carbonKg: { $sum: { $cond: [{ $gt: ['$carbonSavedKg', 0] }, '$carbonSavedKg', { $multiply: ['$estimatedEnergy', 0.7] }] } }
         }
       },
       { $sort: { carbonKg: -1 } }
@@ -102,7 +136,6 @@ const getCarbonData = async (req, res) => {
         cityData.push({ name: 'Others', value: parseFloat(othersCarbon.toFixed(1)), color: colors[5] });
       }
     } else {
-      // Fallback if no completed bookings yet
       cityData = [{ name: 'No Data', value: 100, color: '#9CA3AF' }];
     }
 

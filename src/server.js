@@ -36,6 +36,9 @@ connectDB().then(async () => {
 
 const app = express();
 
+// Trust reverse proxies (Render, Vercel, Cloudflare, AWS) to get real client IP
+app.set('trust proxy', true);
+
 // Middlewares
 app.use(express.json());
 app.use(cors({

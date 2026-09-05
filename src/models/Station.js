@@ -13,6 +13,7 @@ const stationSchema = new mongoose.Schema({
   name: { type: String, required: true },
   location: { type: String, required: true },
   city: { type: String, required: true },
+  state: { type: String },
   address: { type: String },
   latitude: { type: Number },
   longitude: { type: Number },
