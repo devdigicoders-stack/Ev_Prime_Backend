@@ -415,9 +415,20 @@ const _getPartnerStationIds = async (partner) => {
 
 const getMyProfile = async (req, res) => {
   try {
-    res.json(req.partner);
+    const partner = await Partner.findById(req.partner._id || req.partner.id)
+      .select('-appPassword')
+      .populate('parentPartnerId', 'name _id');
+    if (!partner) {
+      return res.status(404).json({ success: false, message: 'Partner not found' });
+    }
+    const partnerObj = partner.toObject ? partner.toObject() : partner;
+    res.json({
+      success: true,
+      data: partnerObj,
+      ...partnerObj
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -1157,7 +1168,7 @@ const Offer = require('../models/Offer');
 // Profile Update
 const updateMyProfile = async (req, res) => {
   try {
-    const partner = await Partner.findById(req.partner.id);
+    const partner = await Partner.findById(req.partner._id || req.partner.id);
     if (!partner) return res.status(404).json({ success: false, message: 'Partner not found' });
 
     if (req.body.name) partner.name = req.body.name;
@@ -1171,27 +1182,44 @@ const updateMyProfile = async (req, res) => {
     if (req.body.businessType !== undefined) partner.businessType = req.body.businessType;
 
     if (req.body.bankDetails) {
-      if (typeof req.body.bankDetails === 'string') {
-        try { partner.bankDetails = JSON.parse(req.body.bankDetails); } catch(e) {}
-      } else {
-        partner.bankDetails = req.body.bankDetails;
+      let bDetails = req.body.bankDetails;
+      if (typeof bDetails === 'string') {
+        try { bDetails = JSON.parse(bDetails); } catch(e) {}
       }
+      partner.bankDetails = {
+        accountName: bDetails.accountName !== undefined ? bDetails.accountName : partner.bankDetails?.accountName,
+        accountNumber: bDetails.accountNumber !== undefined ? bDetails.accountNumber : partner.bankDetails?.accountNumber,
+        ifscCode: bDetails.ifscCode !== undefined ? bDetails.ifscCode : partner.bankDetails?.ifscCode,
+        bankName: bDetails.bankName !== undefined ? bDetails.bankName : partner.bankDetails?.bankName,
+        upiId: bDetails.upiId !== undefined ? bDetails.upiId : partner.bankDetails?.upiId,
+      };
+      partner.markModified('bankDetails');
     }
 
     if (req.body.taxDetails) {
-      if (typeof req.body.taxDetails === 'string') {
-        try { partner.taxDetails = JSON.parse(req.body.taxDetails); } catch(e) {}
-      } else {
-        partner.taxDetails = req.body.taxDetails;
+      let tDetails = req.body.taxDetails;
+      if (typeof tDetails === 'string') {
+        try { tDetails = JSON.parse(tDetails); } catch(e) {}
       }
+      partner.taxDetails = {
+        businessType: tDetails.businessType !== undefined ? tDetails.businessType : partner.taxDetails?.businessType,
+        registrationDate: tDetails.registrationDate !== undefined ? tDetails.registrationDate : partner.taxDetails?.registrationDate,
+        taxCollection: tDetails.taxCollection !== undefined ? tDetails.taxCollection : partner.taxDetails?.taxCollection,
+        tdsApplicable: tDetails.tdsApplicable !== undefined ? tDetails.tdsApplicable : partner.taxDetails?.tdsApplicable,
+      };
+      partner.markModified('taxDetails');
     }
 
     if (req.body.securitySettings) {
-      if (typeof req.body.securitySettings === 'string') {
-        try { partner.securitySettings = JSON.parse(req.body.securitySettings); } catch(e) {}
-      } else {
-        partner.securitySettings = req.body.securitySettings;
+      let sDetails = req.body.securitySettings;
+      if (typeof sDetails === 'string') {
+        try { sDetails = JSON.parse(sDetails); } catch(e) {}
       }
+      partner.securitySettings = {
+        twoFactorEnabled: sDetails.twoFactorEnabled !== undefined ? sDetails.twoFactorEnabled : partner.securitySettings?.twoFactorEnabled,
+        loginAlertsEnabled: sDetails.loginAlertsEnabled !== undefined ? sDetails.loginAlertsEnabled : partner.securitySettings?.loginAlertsEnabled,
+      };
+      partner.markModified('securitySettings');
     }
 
     if (req.body.password) {
@@ -1212,7 +1240,16 @@ const updateMyProfile = async (req, res) => {
     }
 
     await partner.save();
-    res.json({ success: true, message: 'Profile updated successfully' });
+    
+    const partnerObj = partner.toObject ? partner.toObject() : partner;
+    delete partnerObj.appPassword;
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: partnerObj,
+      ...partnerObj
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -1381,14 +1418,24 @@ const getMyPayouts = async (req, res) => {
 
 const requestPayout = async (req, res) => {
   try {
-    const partner = await Partner.findById(req.partner.id);
+    const partnerId = req.partner._id || req.partner.id;
+    const partner = await Partner.findById(partnerId);
     let bankDetails = req.body.bankDetails;
-    if ((!bankDetails || !bankDetails.accountNumber) && partner && partner.bankDetails && partner.bankDetails.accountNumber) {
+    if (typeof bankDetails === 'string') {
+      try { bankDetails = JSON.parse(bankDetails); } catch(e) {}
+    }
+    const hasValidDetails = (bd) => bd && ((bd.accountNumber && bd.accountNumber.toString().trim().length > 0) || (bd.upiId && bd.upiId.toString().trim().length > 0));
+
+    if (!hasValidDetails(bankDetails) && partner && hasValidDetails(partner.bankDetails)) {
       bankDetails = partner.bankDetails;
     }
 
+    if (!hasValidDetails(bankDetails)) {
+      return res.status(400).json({ success: false, message: 'Bank details or UPI ID required for withdrawal.' });
+    }
+
     const payout = await PartnerPayout.create({
-      partner: req.partner.id,
+      partner: partnerId,
       amount: req.body.amount,
       bankDetails: bankDetails,
     });
