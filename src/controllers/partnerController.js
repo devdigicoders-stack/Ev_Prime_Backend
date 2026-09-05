@@ -43,9 +43,6 @@ const createPartner = async (req, res) => {
 const getAllPartners = async (req, res) => {
   try {
     let query = {};
-    if (req.admin && req.admin.adminType === 'subadmin') {
-      query.createdBy = req.admin._id;
-    }
     const partners = await Partner.find(query).select('-appPassword');
     res.json(partners);
   } catch (error) {

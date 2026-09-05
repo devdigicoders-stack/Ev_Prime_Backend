@@ -27,8 +27,10 @@ const getChatHistory = async (req, res) => {
 // @access  Private (Admin)
 const getChatPartners = async (req, res) => {
   try {
-    // Find unique partner IDs from messages
-    const partnerIds = await ChatMessage.distinct('senderId', { senderModel: 'Partner' });
+    // Find unique partner IDs from messages (both sent and received)
+    const senderIds = await ChatMessage.distinct('senderId', { senderModel: 'Partner' });
+    const receiverIds = await ChatMessage.distinct('receiverId', { receiverModel: 'Partner' });
+    const partnerIds = [...new Set([...senderIds, ...receiverIds])];
     const Partner = require('../models/Partner');
     const partners = await Partner.find({ _id: { $in: partnerIds } }).select('name appUsername email');
     

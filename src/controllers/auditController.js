@@ -9,9 +9,7 @@ const getAuditLogs = async (req, res) => {
 
     let query = {};
 
-    if (req.admin && req.admin.adminType === 'subadmin') {
-      query.user = req.admin.name;
-    }
+    // No filtering based on subadmin
 
     // Search filter across User, Role, Action, Module, Details, and IP Address
     if (search && search.trim()) {

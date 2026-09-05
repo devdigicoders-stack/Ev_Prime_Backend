@@ -33,16 +33,6 @@ const getDashboardData = async (req, res) => {
     let bookingMatch = { status: { $in: ['Completed', 'Confirmed', 'Ongoing'] } };
     let bookingPaidMatch = { status: { $in: ['Completed', 'Confirmed'] }, paymentStatus: 'Paid' };
 
-    if (req.admin && req.admin.adminType === 'subadmin') {
-      stationQuery.createdBy = req.admin._id;
-      partnerQuery.createdBy = req.admin._id;
-      
-      const subadminStations = await Station.find({ createdBy: req.admin._id }).select('_id');
-      const subadminStationIds = subadminStations.map(s => s._id);
-      bookingMatch.station = { $in: subadminStationIds };
-      bookingPaidMatch.station = { $in: subadminStationIds };
-    }
-
     // 1. Basic Stats (Users, Stations, Partners) with Growth
     const [
       totalUsers, prevUsers,
@@ -315,9 +305,6 @@ const getDashboardData = async (req, res) => {
 
     // 7. Recent Activities
     let logQuery = {};
-    if (req.admin && req.admin.adminType === 'subadmin') {
-      logQuery.user = req.admin.name;
-    }
     const recentLogs = await AuditLog.find(logQuery).sort({ createdAt: -1 }).limit(5).lean();
     let recentActivities = [];
     if (recentLogs.length > 0) {

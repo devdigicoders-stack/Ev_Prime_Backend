@@ -64,9 +64,6 @@ const createStation = async (req, res) => {
 const getAllStations = async (req, res) => {
   try {
     let query = {};
-    if (req.admin && req.admin.adminType === 'subadmin') {
-      query.createdBy = req.admin._id;
-    }
     const stations = await Station.find(query).sort({ createdAt: -1 }).lean();
 
     // Resolve partner names if partner field is an ObjectId

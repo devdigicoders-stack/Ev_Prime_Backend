@@ -294,11 +294,7 @@ const getAllBookingsAdmin = async (req, res) => {
     const filter = {};
     if (status && status !== 'All') filter.status = status;
 
-    if (req.admin && req.admin.adminType === 'subadmin') {
-      const stations = await Station.find({ createdBy: req.admin._id }).select('_id');
-      const stationIds = stations.map(s => s._id);
-      filter.station = { $in: stationIds };
-    }
+    // No filtering based on subadmin type (handled by route permission)
 
     let bookings = await Booking.find(filter)
       .populate('user', 'name mobile email')
