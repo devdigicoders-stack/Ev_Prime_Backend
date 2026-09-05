@@ -212,15 +212,16 @@ const getDashboardData = async (req, res) => {
       }
     ]);
 
+    // Only include days that actually have data to avoid confusing 0-value bars
     const energyData = [];
     for (let i = energyDays - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const labelInterval = energyDays <= 14 ? 1 : energyDays <= 30 ? 5 : 10;
       const exactDateString = formatDateShort(d);
-      const name = i % labelInterval === 0 ? exactDateString : '';
       const record = dailyEnergy.find(r => r._id === exactDateString);
-      energyData.push({ name, value: record ? Math.floor(record.value) : 0 });
+      if (record && record.value > 0) {
+        energyData.push({ name: exactDateString, value: parseFloat(record.value.toFixed(2)) });
+      }
     }
 
     // 5. Revenue by City (Donut & Top Cities List)
