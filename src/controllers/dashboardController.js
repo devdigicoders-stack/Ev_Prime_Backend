@@ -186,11 +186,18 @@ const getDashboardData = async (req, res) => {
       }
     ]);
 
+    const formatDateShort = (date) => {
+      const d = new Date(date);
+      const day = String(d.getDate()).padStart(2, '0');
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return `${day} ${monthNames[d.getMonth()]}`;
+    };
+
     const revenueData = [];
     for (let i = revenueDays - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const name = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+      const name = formatDateShort(d);
       const record = dailyRevenue.find(r => r._id === name);
       revenueData.push({ name, value: record ? record.value : 0 });
     }
@@ -220,8 +227,8 @@ const getDashboardData = async (req, res) => {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const labelInterval = energyDays <= 14 ? 1 : energyDays <= 30 ? 5 : 10;
-      const name = i % labelInterval === 0 ? d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '';
-      const exactDateString = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+      const exactDateString = formatDateShort(d);
+      const name = i % labelInterval === 0 ? exactDateString : '';
       const record = dailyEnergy.find(r => r._id === exactDateString);
       energyData.push({ name, value: record ? Math.floor(record.value) : 0 });
     }

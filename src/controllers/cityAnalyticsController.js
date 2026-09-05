@@ -158,20 +158,38 @@ const getCityAnalyticsData = async (req, res) => {
     };
 
     // 7. Dynamic Daily / Time-Series Charts (Energy & Revenue)
-    const numDays = days || 30;
-    const chartDaysCount = Math.min(numDays, 30);
+    const formatDateShort = (date) => {
+      const d = new Date(date);
+      const day = String(d.getDate()).padStart(2, '0');
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return `${day} ${monthNames[d.getMonth()]}`;
+    };
+
+    let chartDaysCount = days;
+    if (!days) {
+      if (bookings.length > 0) {
+        const oldest = bookings.reduce((min, b) => {
+          const d = new Date(b.createdAt);
+          return d < min ? d : min;
+        }, new Date());
+        const diffDays = Math.ceil((new Date() - oldest) / (1000 * 60 * 60 * 24));
+        chartDaysCount = Math.min(Math.max(diffDays + 1, 30), 90);
+      } else {
+        chartDaysCount = 30;
+      }
+    }
+
     const dailyMap = {};
 
     for (let i = chartDaysCount - 1; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
-      const key = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+      const key = formatDateShort(d);
       dailyMap[key] = { name: key, energy: 0, revenue: 0 };
     }
 
     bookings.forEach(b => {
-      const bDate = new Date(b.createdAt);
-      const key = bDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+      const key = formatDateShort(b.createdAt);
       if (dailyMap[key]) {
         const energy = b.unitsConsumed || b.estimatedEnergy ||
           (b.estimatedCost && b.pricePerUnit ? Math.round(b.estimatedCost / b.pricePerUnit) : Math.round((b.estimatedCost || 0) / 18)) || 15;
